@@ -1,0 +1,30 @@
+# Local data — never commit databases, artifacts, or encryption keys
+data/
+*.db
+*.db-journal
+.artifact_key
+
+# Secrets and local config
+.env
+.streamlit/secrets.toml
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Legacy local-iteration artifacts — keep out of the public repo
+*_before_*.py
+_backup_before_*/
+reformulation_assurance_v*_patch.zip
+sample_v06_postgres_migration.zip
+sample_v06_qualification_dossier.zip
+BUSINESS_PLAN.md

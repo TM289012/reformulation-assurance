@@ -1,0 +1,43 @@
+services:
+  reformulation-assurance:
+    build: .
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      REFORMULATION_DB_PATH: /app/data/reformulation_assurance_v06.db
+      REFORMULATION_ARTIFACT_ROOT: /app/data/artifacts
+    volumes:
+      - reformulation_data:/app/data
+    restart: unless-stopped
+
+  backup-worker:
+    build: .
+    command: ["python", "backup_worker.py", "--interval-hours", "24"]
+    env_file:
+      - .env
+    environment:
+      REFORMULATION_DB_PATH: /app/data/reformulation_assurance_v06.db
+      REFORMULATION_ARTIFACT_ROOT: /app/data/artifacts
+    volumes:
+      - reformulation_data:/app/data
+    depends_on:
+      - reformulation-assurance
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["migration"]
+    environment:
+      POSTGRES_DB: reformulation_assurance
+      POSTGRES_USER: reformulation
+      POSTGRES_PASSWORD: change-me-before-use
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  reformulation_data:
+  postgres_data:
