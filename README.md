@@ -59,6 +59,8 @@ python -m unittest discover -s tests
 
 ## Using your own data
 
+Two example datasets ship with the repo if you want to try the import wizard first: `demo_coatings_reformulation.csv` (replacing a legacy plasticizer in a coating — same scenario as the built-in demo) and `demo_cosmetics_emulsifier_swap.csv` (replacing a legacy PEG emulsifier in an oil-in-water lotion, with viscosity, pH, stability, and spreadability specs). Import either through **New project → Import your CSV**.
+
 Bring a CSV or Excel sheet where each row is one experiment:
 
 - **Ingredient columns** (they should sum to a fixed total, e.g. 100)

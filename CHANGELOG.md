@@ -8,6 +8,7 @@
 - Added cross-organization outbox isolation regression tests (suite is now 29 tests).
 - Statistics honesty pass: `probability_all_specs` is now a pure joint probability (independence assumption stated) with specification weights and the uncalibrated feasibility estimate moved to a clearly-named `success_score`; backtests now cross-validate the deployed GP with per-fold hyperparameter fitting instead of a frozen-hyperparameter stand-in; GP fits use multiple optimizer restarts; the candidate-pool seed is derived from project state so the closed loop actually explores new candidates each round while staying reproducible. See `MODELING_NOTES.md`.
 - Removed the stale `sample_assurance_report.md` (it showed pre-v0.6.3 probability semantics); regenerate samples with `python demo_v04.py`.
+- Added a second demo dataset, `demo_cosmetics_emulsifier_swap.csv`: replacing a legacy PEG emulsifier in an oil-in-water lotion (88 historical lots including 7 failed emulsions).
 
 ## v0.6.2
 
