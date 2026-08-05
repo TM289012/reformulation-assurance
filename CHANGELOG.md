@@ -6,6 +6,7 @@
 - Added `docs/drift-checker.html`: a standalone, dependency-free, single-page baseline drift checker (XmR individuals chart with limit and run rules). Paste time-ordered measurements of anything that should be stable; runs entirely in the browser.
 - Added `docs/replicate-checker.html`: companion single-page tool answering "is the difference between two formulas real, or replicate noise?" — Welch-style standard-error screen with conservative small-sample thresholds, minimum detectable difference, and a replicates-needed estimate.
 - README: added the live browser demo link and a Single-question tools section.
+- Added `backtest_ranker_vs_baybe.py`: semi-synthetic replay benchmark comparing the app's joint-probability ranking, BayBE 0.15's stateless BotorchRecommender, and random selection on the cosmetics demo project. Protocol biases and v1 limitations are disclosed in the module docstring.
 
 ## v0.6.3
 
