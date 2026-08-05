@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.6.3."""
+"""Streamlit application for Reformulation Assurance v0.7.0."""
 from __future__ import annotations
 
 import os
@@ -52,10 +52,10 @@ def _demo_mode_enabled() -> bool:
 
 DEMO_MODE = _demo_mode_enabled()
 
-st.set_page_config(page_title="Reformulation Assurance v0.6.3", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.7.0", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.6.3 · design → run → verify → qualify → approve → export")
+st.caption("v0.7.0 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 

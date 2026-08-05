@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 (2026-08-05)
+
+The frictionless-entry release: the app is now clickable in a browser with nothing to install, two standalone single-question tools serve the questions formulators hit mid-experiment, and the recommendation layer was benchmarked head-to-head against BayBE with the protocol and results public.
 
 - Added a public demo mode (`REFORMULATION_DEMO_MODE`) for hosted sandboxes: seeds a shared demo workspace with the cosmetics emulsifier-swap project preloaded, one-click demo sign-in, and sandbox warning banners. Off by default; regular deployments are unchanged.
 - Added `docs/drift-checker.html`: a standalone, dependency-free, single-page baseline drift checker (XmR individuals chart with limit and run rules). Paste time-ordered measurements of anything that should be stable; runs entirely in the browser.
