@@ -4,6 +4,8 @@
 
 - Added a public demo mode (`REFORMULATION_DEMO_MODE`) for hosted sandboxes: seeds a shared demo workspace with the cosmetics emulsifier-swap project preloaded, one-click demo sign-in, and sandbox warning banners. Off by default; regular deployments are unchanged.
 - Added `docs/drift-checker.html`: a standalone, dependency-free, single-page baseline drift checker (XmR individuals chart with limit and run rules). Paste time-ordered measurements of anything that should be stable; runs entirely in the browser.
+- Added `docs/replicate-checker.html`: companion single-page tool answering "is the difference between two formulas real, or replicate noise?" — Welch-style standard-error screen with conservative small-sample thresholds, minimum detectable difference, and a replicates-needed estimate.
+- README: added the live browser demo link and a Single-question tools section.
 
 ## v0.6.3
 

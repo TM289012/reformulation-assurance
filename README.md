@@ -2,6 +2,10 @@
 
 **Replace an ingredient without breaking the product — and leave an audit trail a skeptic can check.**
 
+When an ingredient gets discontinued or restricted, proving the replacement works isn't optional — someone has to defend that result later. Run the project in here and the proof assembles itself.
+
+**[▶ Try the live demo in your browser](https://reformulation-assurance-demo.streamlit.app/)** — nothing to install, a cosmetics reformulation project preloaded, one click to enter. It's a shared public sandbox that resets periodically, so never put real formulas in it. (First load can take ~30 seconds if the app is waking up.)
+
 Reformulation Assurance is an open-source, local-first workbench for ingredient-replacement projects in formulated products: coatings, adhesives, sealants — anything mixed to a specification. It takes a team from "our supplier discontinued this plasticizer" to a qualified replacement, with every experiment, model prediction, approval, and decision recorded along the way.
 
 It runs entirely on your machine. Your formulations live in a SQLite file you own. Nothing is uploaded anywhere, there is no telemetry, and there is no cloud account — which matters, because formulations are usually the most confidential thing a company has.
@@ -70,6 +74,13 @@ Bring a CSV or Excel sheet where each row is one experiment:
 - **Status column** (completed / failed / infeasible…) — optional but valuable
 
 **New project → Import your CSV** walks you through mapping columns, setting mixture bounds, choosing the ingredient to remove, and defining specifications. A readiness report flags missing values, duplicates, and impossible totals before anything is modeled.
+
+## Single-question tools (no install)
+
+Two standalone one-page tools answer questions formulators hit mid-experiment. Each runs entirely in your browser — no account, nothing uploaded, view-source friendly:
+
+- **[Baseline Drift Checker](https://tm289012.github.io/reformulation-assurance/drift-checker.html)** — paste time-ordered measurements of anything that should be stable (a control batch, a reference standard, an instrument baseline) and get an XmR-chart verdict: routine noise, or a shift/drift worth investigating.
+- **[Replicate Noise Checker](https://tm289012.github.io/reformulation-assurance/replicate-checker.html)** — paste a few replicates of formula A and formula B and learn whether the difference is real, suggestive, or inside your noise — plus the smallest difference your replicate count could even detect.
 
 ## What the numbers mean (and don't)
 
