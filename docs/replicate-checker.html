@@ -15,14 +15,22 @@
   body {
     margin: 0; padding: 24px 16px 64px;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--ink); background: #f9fafb; line-height: 1.55;
+    color: var(--ink); line-height: 1.55;
+    background: #f9fafb linear-gradient(180deg, #f0fdfa 0%, #f9fafb 220px) no-repeat;
   }
   main { max-width: 760px; margin: 0 auto; }
+  .eyebrow {
+    display: inline-block; font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent);
+    text-decoration: none; margin-bottom: 6px;
+  }
+  .eyebrow:hover { text-decoration: underline; }
   h1 { font-size: 1.7rem; margin: 0 0 4px; }
   .tagline { color: var(--muted); margin: 0 0 20px; font-size: 1.02rem; }
   .card {
-    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
     padding: 18px; margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(15, 118, 110, 0.06);
   }
   .cols { display: flex; gap: 14px; flex-wrap: wrap; }
   .col { flex: 1 1 220px; }
@@ -64,6 +72,7 @@
 </head>
 <body>
 <main>
+  <a class="eyebrow" href="index.html">Reformulation Assurance · free formulation checkers</a>
   <h1>Replicate Noise Checker</h1>
   <p class="tagline">You measured formula A and formula B a few times each. Paste the numbers and find out whether the difference between them is real, or inside your replicate noise.</p>
 

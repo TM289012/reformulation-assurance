@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reformulation Assurance — free formulation checkers</title>
+<meta name="description" content="Free single-question tools for formulators: check a baseline for drift, check whether two formulas really differ. Each answers one question in your browser in 30 seconds. No login, nothing uploaded.">
+<style>
+  :root {
+    --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #0f766e; --accent2: #7c3aed;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 40px 16px 64px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); line-height: 1.55;
+    background: #f9fafb linear-gradient(180deg, #f0fdfa 0%, #f9fafb 260px) no-repeat;
+  }
+  main { max-width: 760px; margin: 0 auto; }
+  .eyebrow {
+    display: inline-block; font-size: 0.78rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent);
+    margin-bottom: 6px;
+  }
+  h1 { font-size: 2rem; margin: 0 0 8px; }
+  .tagline { color: var(--muted); margin: 0 0 28px; font-size: 1.08rem; max-width: 620px; }
+  .card {
+    display: block; background: #fff; border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px; margin-bottom: 14px;
+    box-shadow: 0 1px 3px rgba(15, 118, 110, 0.06);
+    text-decoration: none; color: var(--ink);
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .card:hover {
+    box-shadow: 0 4px 14px rgba(15, 118, 110, 0.14);
+    transform: translateY(-1px);
+  }
+  .card h2 { margin: 0 0 6px; font-size: 1.2rem; color: var(--accent); }
+  .card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+  .card .go { display: inline-block; margin-top: 10px; font-weight: 600; color: var(--accent); font-size: 0.9rem; }
+  .apps { margin-top: 30px; }
+  .apps h3 { font-size: 1rem; margin: 0 0 8px; }
+  .apps p { color: var(--muted); font-size: 0.92rem; margin: 0 0 6px; }
+  .apps a { color: var(--accent); }
+  footer { margin-top: 36px; font-size: 0.85rem; color: var(--muted); }
+  footer a { color: var(--accent); }
+  .privacy { margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <span class="eyebrow">Reformulation Assurance</span>
+  <h1>Free formulation checkers</h1>
+  <p class="tagline">Single-question tools for people who make things to a specification. Each one answers one question, in your browser, in about thirty seconds. No login, no install, and nothing you paste ever leaves your machine.</p>
+
+  <a class="card" href="drift-checker.html">
+    <h2>Baseline Drift Checker</h2>
+    <p>Your control batch, reference standard, or instrument should read the same every time. Paste its history and find out whether the wobble is routine noise or a real shift — before it quietly invalidates your comparisons.</p>
+    <span class="go">Open the drift checker →</span>
+  </a>
+
+  <a class="card" href="replicate-checker.html">
+    <h2>Replicate Noise Checker</h2>
+    <p>You measured formula A and formula B a few times each. Paste both sets and learn whether the difference is real, borderline, or inside your noise — plus the smallest difference your replicate count could even detect.</p>
+    <span class="go">Open the replicate checker →</span>
+  </a>
+
+  <div class="apps">
+    <h3>The full workbench</h3>
+    <p>These checkers are spin-offs from <a href="https://github.com/TM289012/reformulation-assurance">Reformulation Assurance</a>, an open-source workbench for ingredient-replacement projects: model-suggested experiments, staged qualification gates, and sign-offs bound to a hash of the evidence.</p>
+    <p><a href="https://reformulation-assurance-demo.streamlit.app/">Try the live demo</a> — nothing to install, a cosmetics reformulation project preloaded.</p>
+  </div>
+
+  <footer>
+    Free and open-source (MIT) · <a href="https://github.com/TM289012/reformulation-assurance">Source on GitHub</a>
+    <div class="privacy">Every tool on this page runs entirely in your browser. Nothing you paste leaves this page.</div>
+  </footer>
+</main>
+</body>
+</html>
