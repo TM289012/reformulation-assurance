@@ -38,9 +38,25 @@ DEFAULT_DB = Path(os.environ.get("REFORMULATION_DB_PATH", APP_DIR / "data" / "re
 ARTIFACT_ROOT = Path(os.environ.get("REFORMULATION_ARTIFACT_ROOT", APP_DIR / "data" / "artifacts"))
 DEMO_FILE = APP_DIR / "demo_coatings_reformulation.csv"
 
+
+def _demo_mode_enabled() -> bool:
+    """Public-sandbox mode, set via env var or Streamlit secrets. Off by default."""
+    flag = os.environ.get("REFORMULATION_DEMO_MODE", "")
+    if not flag:
+        try:
+            flag = str(st.secrets.get("REFORMULATION_DEMO_MODE", ""))
+        except Exception:
+            flag = ""
+    return flag.strip().lower() in {"1", "true", "yes", "on"}
+
+
+DEMO_MODE = _demo_mode_enabled()
+
 st.set_page_config(page_title="Reformulation Assurance v0.6.3", page_icon="🧪", layout="wide")
+print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
 st.caption("v0.6.3 · design → run → verify → qualify → approve → export")
+print("[boot] title rendered", flush=True)
 
 
 @st.cache_resource
@@ -55,6 +71,13 @@ def get_vault() -> ArtifactVault:
 
 store = get_store()
 vault = get_vault()
+print("[boot] store and vault ready", flush=True)
+
+if DEMO_MODE:
+    from demo_seed import DEMO_OWNER_EMAIL, DEMO_OWNER_PASSWORD, seed_demo
+
+    seed_demo(store)
+    print("[boot] demo seed complete", flush=True)
 
 
 def set_flash(message: str, level: str = "success") -> None:
@@ -75,6 +98,26 @@ def first_url(text: str) -> str | None:
 
 
 def authentication_screen() -> dict[str, Any]:
+    print("[boot] auth screen reached", flush=True)
+    if DEMO_MODE and not st.session_state.get("current_user"):
+        st.info(
+            "**Public demo.** Shared sandbox preloaded with a cosmetics reformulation "
+            "project (88 lots). Anything you enter is visible to other visitors and is "
+            "wiped periodically. Never enter real formulas here — for real work, run the "
+            "app locally so data stays on your machine."
+        )
+        if st.button("Enter the demo", type="primary", use_container_width=True):
+            demo_user = store.authenticate(DEMO_OWNER_EMAIL, DEMO_OWNER_PASSWORD)
+            if demo_user:
+                st.session_state["current_user"] = demo_user
+                st.rerun()
+            else:
+                st.error(
+                    "The demo account is unavailable (someone may have changed the "
+                    "sandbox password). It comes back at the next reset — or reboot "
+                    "the app if you are the operator."
+                )
+        st.caption(f"Or sign in manually: {DEMO_OWNER_EMAIL} / {DEMO_OWNER_PASSWORD}")
     if not store.has_users():
         st.subheader("Create the first workspace owner")
         st.info("This account controls the first organization. Use a private deployment for real company data.")
@@ -181,6 +224,11 @@ current_role = str(organization_row["role"])
 can_edit = current_role in EDIT_ROLES
 can_approve = current_role in APPROVAL_ROLES
 can_admin = current_role in ADMIN_ROLES
+if DEMO_MODE:
+    st.warning(
+        "Public demo sandbox — shared with other visitors, resets periodically. "
+        "Explore freely; don't enter anything real."
+    )
 show_flash()
 
 

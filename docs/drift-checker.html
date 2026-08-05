@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Baseline Drift Checker</title>
+<meta name="description" content="Paste repeated measurements of something that should be stable. Find out in seconds whether your baseline is drifting or it's just routine noise. Runs entirely in your browser.">
+<style>
+  :root {
+    --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #0f766e; --bad: #b91c1c; --badbg: #fef2f2;
+    --good: #166534; --goodbg: #f0fdf4; --warn: #92400e; --warnbg: #fffbeb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 16px 64px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: #f9fafb; line-height: 1.55;
+  }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 1.7rem; margin: 0 0 4px; }
+  .tagline { color: var(--muted); margin: 0 0 20px; font-size: 1.02rem; }
+  .card {
+    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px; margin-bottom: 16px;
+  }
+  label { font-weight: 600; display: block; margin-bottom: 6px; }
+  .hint { color: var(--muted); font-size: 0.88rem; margin: 0 0 10px; }
+  textarea {
+    width: 100%; min-height: 150px; resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.95rem; padding: 10px; border: 1px solid var(--line);
+    border-radius: 8px; color: var(--ink);
+  }
+  textarea:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+  button {
+    font-size: 0.95rem; padding: 9px 16px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button:hover { filter: brightness(0.96); }
+  #verdict { display: none; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; border: 1px solid var(--line); }
+  #verdict.good { background: var(--goodbg); border-color: #bbf7d0; }
+  #verdict.bad { background: var(--badbg); border-color: #fecaca; }
+  #verdict.warn { background: var(--warnbg); border-color: #fde68a; }
+  #verdict h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  #verdict.good h2 { color: var(--good); }
+  #verdict.bad h2 { color: var(--bad); }
+  #verdict.warn h2 { color: var(--warn); }
+  #verdict p { margin: 4px 0; font-size: 0.95rem; }
+  #chartwrap { display: none; }
+  svg { width: 100%; height: auto; display: block; }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; color: var(--muted); font-size: 0.88rem; margin-top: 8px; }
+  .stats b { color: var(--ink); font-weight: 600; }
+  .method { font-size: 0.85rem; color: var(--muted); }
+  .method summary { cursor: pointer; font-weight: 600; color: var(--ink); }
+  footer { margin-top: 28px; font-size: 0.85rem; color: var(--muted); }
+  footer a { color: var(--accent); }
+  .privacy { margin-top: 6px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Baseline Drift Checker</h1>
+  <p class="tagline">Paste repeated measurements of something that should be stable &mdash; a control batch, a reference standard, an instrument baseline. Find out in seconds whether it's drifting or it's just noise.</p>
+
+  <div class="card">
+    <label for="data">Your measurements, in time order (oldest first)</label>
+    <p class="hint">One per line, or separated by commas or spaces. 8+ points give reliable limits; 15+ is better.</p>
+    <textarea id="data" placeholder="5.31&#10;5.28&#10;5.33&#10;5.30&#10;5.29&#10;&hellip;"></textarea>
+    <div class="row">
+      <button class="primary" id="check">Check for drift</button>
+      <button id="ex-stable">Load example: stable</button>
+      <button id="ex-drift">Load example: drifting</button>
+    </div>
+  </div>
+
+  <div id="verdict" role="status"></div>
+
+  <div class="card" id="chartwrap">
+    <svg id="chart" viewBox="0 0 760 300" preserveAspectRatio="xMidYMid meet" aria-label="Individuals control chart of the pasted measurements"></svg>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="card method">
+    <details>
+      <summary>How this works (and what it can't tell you)</summary>
+      <p>This is an XmR individuals chart, the classic process-behavior chart (Shewhart; see Donald Wheeler's books). The limits are <i>mean &plusmn; 2.66 &times; average moving range</i>, computed from your own data. They describe how much routine, point-to-point noise your measurements already contain.</p>
+      <p>Two signals are checked: <b>any point outside the limits</b> (something changed abruptly), and <b>8 or more consecutive points on the same side of the mean</b> (something is slowly drifting). If neither fires, the honest reading is that your variation looks routine and chasing individual ups and downs will just chase noise.</p>
+      <p>Limits: it assumes your values are in time order and describe one thing that should be stable. It won't detect drift smaller than your noise floor with few points, it doesn't model autocorrelation, and with fewer than 8 points the limits are provisional. A verdict here is a reason to look, not a root cause.</p>
+    </details>
+  </div>
+
+  <footer>
+    Free and open-source (MIT). Part of <a href="https://github.com/TM289012/reformulation-assurance">Reformulation Assurance</a>, an open qualification workflow for ingredient-replacement projects.
+    <div class="privacy">Runs entirely in your browser. Nothing you paste leaves this page.</div>
+  </footer>
+</main>
+
+<script>
+"use strict";
+
+function parseValues(text) {
+  const tokens = String(text || "").split(/[\s,;]+/).filter(function (t) { return t.length > 0; });
+  const values = [];
+  let ignored = 0;
+  tokens.forEach(function (t) {
+    const v = Number(t);
+    if (Number.isFinite(v)) { values.push(v); } else { ignored += 1; }
+  });
+  return { values: values, ignored: ignored };
+}
+
+function analyze(values) {
+  const n = values.length;
+  const mean = values.reduce(function (a, b) { return a + b; }, 0) / n;
+  const movingRanges = [];
+  for (let i = 1; i < n; i++) { movingRanges.push(Math.abs(values[i] - values[i - 1])); }
+  const mrBar = movingRanges.length
+    ? movingRanges.reduce(function (a, b) { return a + b; }, 0) / movingRanges.length
+    : 0;
+  const upper = mean + 2.66 * mrBar;
+  const lower = mean - 2.66 * mrBar;
+
+  const outside = [];
+  values.forEach(function (v, i) { if (v > upper || v < lower) { outside.push(i); } });
+
+  // Runs of 8+ consecutive points strictly on one side of the mean.
+  const runs = [];
+  const runPoints = [];
+  let runStart = 0;
+  let runSide = 0; // 1 above, -1 below, 0 on the mean
+  for (let i = 0; i <= n; i++) {
+    const side = i < n ? Math.sign(values[i] - mean) : 0;
+    if (i === n || side === 0 || side !== runSide) {
+      if (runSide !== 0 && i - runStart >= 8) {
+        runs.push({ start: runStart, length: i - runStart, above: runSide > 0 });
+        for (let j = runStart; j < i; j++) { runPoints.push(j); }
+      }
+      runStart = i;
+      runSide = side;
+    }
+  }
+
+  return {
+    n: n, mean: mean, mrBar: mrBar, upper: upper, lower: lower,
+    outside: outside, runs: runs, runPoints: runPoints,
+    detectable: 2.66 * mrBar
+  };
+}
+
+function fmt(x) {
+  if (!Number.isFinite(x)) { return "—"; }
+  const magnitude = Math.abs(x);
+  const digits = magnitude >= 1000 ? 1 : magnitude >= 10 ? 2 : magnitude >= 0.1 ? 3 : 4;
+  return x.toFixed(digits);
+}
+
+function drawChart(values, result) {
+  const svg = document.getElementById("chart");
+  const W = 760, H = 300, padL = 62, padR = 16, padT = 18, padB = 34;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const lo = Math.min(result.lower, Math.min.apply(null, values));
+  const hi = Math.max(result.upper, Math.max.apply(null, values));
+  const span = (hi - lo) || 1;
+  const y = function (v) { return padT + innerH * (1 - (v - lo + span * 0.06) / (span * 1.12)); };
+  const x = function (i) {
+    return values.length === 1 ? padL + innerW / 2 : padL + innerW * (i / (values.length - 1));
+  };
+  const flagged = {}; // 2 = outside limits (red), 1 = part of a run (amber)
+  result.runPoints.forEach(function (i) { flagged[i] = 1; });
+  result.outside.forEach(function (i) { flagged[i] = 2; });
+
+  let s = "";
+  const hline = function (v, color, dash, label) {
+    s += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(v) + '" y2="' + y(v) +
+         '" stroke="' + color + '" stroke-width="1.4" stroke-dasharray="' + dash + '"/>';
+    s += '<text x="' + (padL - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end" font-size="11" fill="' + color + '">' + label + '</text>';
+  };
+  hline(result.upper, "#b91c1c", "5 4", fmt(result.upper));
+  hline(result.mean, "#6b7280", "2 3", fmt(result.mean));
+  hline(result.lower, "#b91c1c", "5 4", fmt(result.lower));
+
+  let path = "";
+  values.forEach(function (v, i) { path += (i ? "L" : "M") + x(i) + " " + y(v) + " "; });
+  s += '<path d="' + path + '" fill="none" stroke="#9ca3af" stroke-width="1.4"/>';
+
+  values.forEach(function (v, i) {
+    const flag = flagged[i] || 0;
+    const fill = flag === 2 ? "#b91c1c" : flag === 1 ? "#d97706" : "#0f766e";
+    s += '<circle cx="' + x(i) + '" cy="' + y(v) + '" r="' + (flag ? 5 : 3.5) + '" fill="' + fill + '"/>';
+  });
+  s += '<text x="' + (padL + innerW / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" fill="#6b7280">measurement number (time order →)</text>';
+  svg.innerHTML = s;
+}
+
+function render() {
+  const parsed = parseValues(document.getElementById("data").value);
+  const values = parsed.values;
+  const verdict = document.getElementById("verdict");
+  const chartwrap = document.getElementById("chartwrap");
+  verdict.style.display = "block";
+
+  if (values.length < 2) {
+    verdict.className = "warn";
+    verdict.innerHTML = "<h2>Not enough data</h2><p>Paste at least a handful of numbers (8+ for reliable limits). " +
+      (parsed.ignored ? parsed.ignored + " non-numeric entries were ignored." : "") + "</p>";
+    chartwrap.style.display = "none";
+    return;
+  }
+
+  const result = analyze(values);
+  drawChart(values, result);
+  chartwrap.style.display = "block";
+
+  const notes = [];
+  if (parsed.ignored) { notes.push(parsed.ignored + " non-numeric entr" + (parsed.ignored === 1 ? "y was" : "ies were") + " ignored."); }
+  const provisional = result.n < 8;
+  if (provisional) { notes.push("Only " + result.n + " points — the limits are provisional; 8+ gives a reliable answer."); }
+
+  if (result.mrBar === 0) {
+    verdict.className = "warn";
+    verdict.innerHTML = "<h2>Every value is identical</h2><p>There is no point-to-point variation at all, so limits can't be computed. Real measurements always vary; check the resolution of what you pasted.</p>";
+    document.getElementById("stats").innerHTML = "";
+    return;
+  }
+
+  const signals = [];
+  if (result.outside.length) {
+    const pts = result.outside.slice(0, 6).map(function (i) { return "#" + (i + 1); }).join(", ");
+    signals.push("<b>" + result.outside.length + " point" + (result.outside.length > 1 ? "s" : "") +
+      " outside the natural limits</b> (" + pts + (result.outside.length > 6 ? ", …" : "") +
+      ") — an abrupt change bigger than your routine noise.");
+  }
+  if (result.runs.length) {
+    const parts = result.runs.map(function (r) {
+      return r.length + " consecutive points " + (r.above ? "above" : "below") +
+        " the mean starting at #" + (r.start + 1);
+    });
+    signals.push("<b>Sustained run" + (result.runs.length > 1 ? "s" : "") + ": " + parts.join(", then ") +
+      "</b> — the signature of a slow drift rather than a one-off.");
+  }
+
+  if (signals.length) {
+    verdict.className = "bad";
+    verdict.innerHTML = "<h2>Signal: this doesn't look like routine noise</h2>" +
+      signals.map(function (t) { return "<p>" + t + "</p>"; }).join("") +
+      "<p>Worth investigating before trusting comparisons against this baseline." +
+      (notes.length ? " " + notes.join(" ") : "") + "</p>";
+  } else {
+    verdict.className = provisional ? "warn" : "good";
+    verdict.innerHTML = "<h2>" + (provisional ? "No signal so far" : "No evidence of drift") + "</h2>" +
+      "<p>The variation in these " + result.n + " measurements looks routine: everything sits inside the natural limits (" +
+      fmt(result.lower) + " to " + fmt(result.upper) + ") with no sustained runs. Chasing individual ups and downs here would be chasing noise.</p>" +
+      "<p>A real shift would need to move the baseline by roughly " + fmt(result.detectable) +
+      " (in your units) before a single point would flag it; slow drifts smaller than that show up as runs instead." +
+      (notes.length ? " " + notes.join(" ") : "") + "</p>";
+  }
+
+  document.getElementById("stats").innerHTML =
+    "<span>n <b>" + result.n + "</b></span>" +
+    "<span>mean <b>" + fmt(result.mean) + "</b></span>" +
+    "<span>avg moving range <b>" + fmt(result.mrBar) + "</b></span>" +
+    "<span>natural limits <b>" + fmt(result.lower) + " – " + fmt(result.upper) + "</b></span>";
+}
+
+document.getElementById("check").addEventListener("click", render);
+document.getElementById("ex-stable").addEventListener("click", function () {
+  document.getElementById("data").value =
+    "5.31\n5.28\n5.33\n5.30\n5.27\n5.32\n5.29\n5.31\n5.26\n5.30\n5.33\n5.28\n5.31\n5.29\n5.32\n5.27\n5.30\n5.29\n5.31\n5.28";
+  render();
+});
+document.getElementById("ex-drift").addEventListener("click", function () {
+  document.getElementById("data").value =
+    "5.31\n5.28\n5.33\n5.30\n5.27\n5.32\n5.29\n5.31\n5.30\n5.33\n5.35\n5.36\n5.38\n5.37\n5.40\n5.42\n5.41\n5.44\n5.46\n5.48";
+  render();
+});
+</script>
+</body>
+</html>
