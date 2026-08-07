@@ -1,8 +1,9 @@
-"""Streamlit application for Reformulation Assurance v0.7.0."""
+"""Streamlit application for Reformulation Assurance v0.8.0."""
 from __future__ import annotations
 
 import os
 import re
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,7 @@ from closed_loop import (
     qualification_progress,
     refresh_after_result,
 )
-from dossier import compute_evidence_hash, generate_dossier
+from dossier import evidence_snapshot_and_hash, generate_dossier
 from artifact_vault import ArtifactVault
 from backup_service import create_backup
 from notifications import deliver_queued_notifications
@@ -52,10 +53,10 @@ def _demo_mode_enabled() -> bool:
 
 DEMO_MODE = _demo_mode_enabled()
 
-st.set_page_config(page_title="Reformulation Assurance v0.7.0", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.8.0", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.7.0 · design → run → verify → qualify → approve → export")
+st.caption("v0.8.0 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
@@ -1224,7 +1225,7 @@ elif page == "Qualification":
 
 elif page == "Approvals & dossier":
     st.header("Approvals and qualification dossier")
-    evidence_hash = compute_evidence_hash(store, project_id)
+    evidence_snapshot, evidence_hash = evidence_snapshot_and_hash(store, project_id)
     progress = qualification_progress(store, project_id)
     approvals = store.list_approvals(project_id)
 
@@ -1248,6 +1249,35 @@ elif page == "Approvals & dossier":
         )
         if (~approval_view["matches_current_evidence"]).any():
             st.warning("Some signatures refer to an earlier evidence state. New results or configuration changes require a new signature.")
+        with st.expander("View the exact evidence a signature covers"):
+            viewer_rows = approvals.reset_index(drop=True)
+            viewer_labels = [
+                f"{row['stage']} · {row['signer_name']} · {row['signed_at']} · {row['status']}"
+                for _, row in viewer_rows.iterrows()
+            ]
+            chosen = st.selectbox(
+                "Signature",
+                range(len(viewer_labels)),
+                format_func=lambda idx: viewer_labels[idx],
+                key="signed_snapshot_choice",
+            )
+            chosen_row = viewer_rows.iloc[int(chosen)]
+            stored_snapshot = chosen_row.get("evidence_snapshot") if "evidence_snapshot" in viewer_rows.columns else None
+            if isinstance(stored_snapshot, str) and stored_snapshot:
+                recomputed_hash = sha256(stored_snapshot.encode("utf-8")).hexdigest()
+                if recomputed_hash == str(chosen_row["evidence_hash"]):
+                    st.success("Stored snapshot verifies: re-hashing it reproduces the hash recorded at signing.")
+                else:
+                    st.error("Integrity problem: the stored snapshot no longer matches the hash recorded at signing.")
+                st.download_button(
+                    "Download signed evidence snapshot (JSON)",
+                    data=stored_snapshot.encode("utf-8"),
+                    file_name=f"signed_evidence_{chosen_row['stage']}_{str(chosen_row['evidence_hash'])[:12]}.json",
+                    mime="application/json",
+                    key="signed_snapshot_download",
+                )
+            else:
+                st.caption("Signed before v0.8.0, when only the evidence hash was stored. The exact signed snapshot is not available for this signature.")
 
     st.markdown("### Multi-signer approval policies")
     policies = store.list_approval_policies(project_id)
@@ -1321,7 +1351,7 @@ elif page == "Approvals & dossier":
             typed_name = st.text_input("Type your full account name", value=current_user["display_name"])
             comment = st.text_area("Approval comment or limitations")
             password = st.text_input("Re-enter your password", type="password")
-            acknowledge = st.checkbox("I understand this signature is attached to the current evidence hash.")
+            acknowledge = st.checkbox("I understand this signature is attached to the current evidence snapshot and its hash.")
             signed = st.form_submit_button("Sign approval", type="primary")
         if signed:
             if not acknowledge:
@@ -1336,16 +1366,17 @@ elif page == "Approvals & dossier":
                         password=password,
                         signature_meaning=meaning,
                         evidence_hash=evidence_hash,
+                        evidence_snapshot=evidence_snapshot,
                         comment=comment,
                         policy_id=selected_policy_id,
                     )
-                    set_flash("Approval signed and linked to the current evidence hash.")
+                    set_flash("Approval signed; the frozen evidence snapshot was stored with it.")
                     st.rerun()
                 except Exception as exc:
                     st.error(str(exc))
 
     st.markdown("### Export qualification dossier")
-    st.write("The ZIP package includes a printable HTML dossier, scientific evidence JSON, CSV evidence tables, signatures, audit history, and SHA-256 checksums.")
+    st.write("The ZIP package includes a printable HTML dossier, scientific evidence JSON, signed evidence snapshots, CSV evidence tables, signatures, audit history, and SHA-256 checksums.")
     if st.button("Generate dossier package", type="primary", use_container_width=True):
         with st.spinner("Assembling evidence and checksums..."):
             dossier_bytes, manifest = generate_dossier(

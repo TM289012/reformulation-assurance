@@ -1,39 +1,32 @@
 # Product Roadmap
 
-## Current: v0.6.2 — Pilot workflow rehearsal
+The project's goal at this stage is domain signal and honest evidence, not sales: get the workflow in front of real formulators and statisticians, collect criticism, and let the calibration pages prove or disprove the models in public.
 
-The product now supports a complete, auditable rehearsal from historical data through recommendation, confirmation, process-window design, robustness, approval, and dossier export.
+## Shipped: v0.8.0 — Signed evidence snapshots (August 2026)
 
-## v0.7 — Real design-partner pilot
+Sign-offs now store the full frozen evidence snapshot (canonical JSON) alongside the SHA-256 hash and the signature, so an auditor can always see the exact evidence a signature covered instead of only proving that it changed. Adopted from the practice recommended by the eLabFTW maintainer: sign a snapshot, store both together, never bind signatures to live data. See CHANGELOG.md.
 
-- PostgreSQL as the active runtime
-- Managed object storage and offsite backups
-- Email delivery, password recovery, and deployment monitoring
-- Organization-configurable measurement validation and units
-- Process-window result visualization and response-surface comparisons
-- Supplier-lot study designer
+## Shipped: v0.7.0 — Frictionless entry (August 2026)
+
+The app is clickable in a browser with nothing to install (public demo sandbox), two standalone single-question tools serve the questions formulators hit mid-experiment (baseline drift, replicate noise), and the recommendation layer was benchmarked head-to-head against BayBE 0.15 with the protocol, biases, and results public. See CHANGELOG.md and the v0.7.0 release.
+
+## Next: v0.9 — Chemistry-aware suggestions (in design on branch `v08-slot-based`, named before this renumbering)
+
+- **Slot-based ingredient representation.** Instead of one column per candidate emulsifier, model the substitution question the way it is actually asked: one emulsifier slot choosing WHICH substance (BayBE `SubstanceParameter`, encoded from real molecular structures) and HOW MUCH, hybrid with traditional columns for everything else. Day-one spike is complete and on the branch (`v08_slot_spike.py`): five real molecules with PubChem-sourced SMILES (the polymeric legacy PEG as a disclosed representative oligomer), MORDRED descriptors, stateless recommender end to end.
+- **Optional BayBE ranking mode in the app.** The benchmark showed BayBE's recommender with a proper multi-target objective performs on par with the built-in ranking; offering it as an optional mode (own candidate pool via `SearchSpace.from_dataframe`, stateless `recommend`) is now justified. Behind an optional extras install (`baybe` pulls PyTorch); the core app stays light.
+- **Sparse-history benchmark.** v2 of the benchmark started every arm with 88 informative measurements, friendly territory for pure exploitation. The v3 question: how do the arms compare when history is thin, where Bayesian optimization's exploration should earn its keep?
+- **In-app drift detection.** Apply the standalone drift checker's rules (XmR limits, run rules) to each project's own prospective-calibration residuals, so a shifting instrument or process flags itself.
+- **SMILES support in the import wizard.** An optional molecular-structure column, so slot-based modeling and chemical encodings become available to real datasets, not just the demo.
+
+## Later, if real users ask
+
 - Stability-study scheduling and timepoint tracking
-- Dataset/version rollback
-- Admin-visible error logs and support diagnostics
+- Supplier-lot study designer improvements and process-window result visualization
+- PostgreSQL as the active runtime, managed backups, email delivery
+- Dataset/version rollback and admin-visible diagnostics
 
-## v0.8 — Repeatable paid pilot
+## Explicitly parked (enterprise-era items)
 
-- Deployment automation and staging/production separation
-- SSO and MFA
-- Fine-grained project permissions
-- API and ELN/LIMS import connectors
-- Configurable approval templates and document branding
-- Security review, penetration testing, and disaster-recovery rehearsal
-- Customer-specific model validation report
+SSO/MFA, fine-grained permissions, deployment automation, penetration testing, billing, SLAs, and ELN/LIMS connectors are parked until there is evidence of demand from real teams. They belong to a sales motion this project is not currently running.
 
-## v1.0 — Commercially launchable product
-
-- Native PostgreSQL multi-instance architecture
-- Durable encrypted object storage
-- Operational SLAs, observability, incident response, and support
-- Billing, contracts, onboarding, and product analytics
-- Validated domain templates for at least one formulation vertical
-- Prospective evidence from multiple real customer campaigns
-- Legal, privacy, IP, and security controls appropriate to the target market
-
-Regulated electronic-signature or quality-system claims remain a separate program and are not implied by v1.0.
+Regulated electronic-signature or quality-system claims remain a separate program and are not implied by any version above.

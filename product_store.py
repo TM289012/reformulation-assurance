@@ -63,6 +63,7 @@ class ProductStore(ProjectStore):
                     signature_meaning TEXT NOT NULL,
                     comment TEXT NOT NULL DEFAULT '',
                     evidence_hash TEXT NOT NULL,
+                    evidence_snapshot TEXT,
                     signed_at TEXT NOT NULL,
                     withdrawn_at TEXT
                 );
@@ -88,6 +89,9 @@ class ProductStore(ProjectStore):
                 con.execute("ALTER TABLE projects ADD COLUMN organization_id TEXT")
             if "created_by_user_id" not in project_columns:
                 con.execute("ALTER TABLE projects ADD COLUMN created_by_user_id TEXT")
+            approval_columns = self._column_names(con, "approvals")
+            if "evidence_snapshot" not in approval_columns:
+                con.execute("ALTER TABLE approvals ADD COLUMN evidence_snapshot TEXT")
 
     def has_users(self) -> bool:
         with self.connection() as con:
@@ -302,6 +306,7 @@ class ProductStore(ProjectStore):
         password: str,
         signature_meaning: str,
         evidence_hash: str,
+        evidence_snapshot: str | None = None,
         comment: str = "",
     ) -> str:
         organization_id = self.project_organization(project_id)
@@ -329,8 +334,8 @@ class ProductStore(ProjectStore):
             con.execute(
                 """INSERT INTO approvals
                 (id, project_id, stage, status, signer_user_id, signer_name,
-                 signer_role, signature_meaning, comment, evidence_hash, signed_at)
-                VALUES (?, ?, ?, 'signed', ?, ?, ?, ?, ?, ?, ?)""",
+                 signer_role, signature_meaning, comment, evidence_hash, evidence_snapshot, signed_at)
+                VALUES (?, ?, ?, 'signed', ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     approval_id,
                     project_id,
@@ -341,6 +346,7 @@ class ProductStore(ProjectStore):
                     signature_meaning.strip(),
                     comment.strip(),
                     evidence_hash,
+                    evidence_snapshot,
                     _now(),
                 ),
             )

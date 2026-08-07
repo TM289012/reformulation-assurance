@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.8.0 (2026-08-07)
+
+Signatures now preserve the exact evidence they covered. Previously a sign-off stored only the SHA-256 hash of the evidence bundle: enough to prove the evidence changed after signing, but not enough to show an auditor what was actually signed. Each signature now stores the full frozen canonical-JSON snapshot alongside the hash, adopting the practice recommended by Nicolas CARPi, maintainer of eLabFTW: sign a snapshot, store the snapshot with the signature, and never bind signatures to live data.
+
+- Approvals now store an `evidence_snapshot` column, the canonical JSON frozen at signing. Existing databases are migrated automatically; signatures made before this release remain valid and are labeled as hash-only.
+- Approvals page: a per-signature viewer shows whether the stored snapshot still re-hashes to the hash recorded at signing, and offers the snapshot as a JSON download.
+- Dossier ZIP: a `signed_evidence_snapshots/` folder carries each signature's frozen evidence, and the HTML approval table gains a `snapshot_stored` column. `approvals.csv` stays readable; the snapshot text is excluded there.
+- Stale-signature flagging is unchanged, but its meaning is cleaner: it now reads as "the newest evidence has not been signed yet" rather than "an old signature broke."
+- Fixed stale v0.6.2 version stamps in generated dossiers.
+
 ## v0.7.0 (2026-08-05)
 
 The frictionless-entry release: the app is now clickable in a browser with nothing to install, two standalone single-question tools serve the questions formulators hit mid-experiment, and the recommendation layer was benchmarked head-to-head against BayBE with the protocol and results public.

@@ -594,6 +594,7 @@ class PilotStore(ProductStore):
         password: str,
         signature_meaning: str,
         evidence_hash: str,
+        evidence_snapshot: str | None = None,
         comment: str = "",
         policy_id: str | None = None,
     ) -> str:
@@ -637,10 +638,10 @@ class PilotStore(ProductStore):
             con.execute(
                 """INSERT INTO approvals
                 (id, project_id, stage, status, signer_user_id, signer_name,
-                 signer_role, signature_meaning, comment, evidence_hash, signed_at, policy_id)
-                VALUES (?, ?, ?, 'signed', ?, ?, ?, ?, ?, ?, ?, ?)""",
+                 signer_role, signature_meaning, comment, evidence_hash, evidence_snapshot, signed_at, policy_id)
+                VALUES (?, ?, ?, 'signed', ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (approval_id, project_id, stage, signer_user_id, user["display_name"], role,
-                 signature_meaning.strip(), comment.strip(), evidence_hash, _now(), policy_id),
+                 signature_meaning.strip(), comment.strip(), evidence_hash, evidence_snapshot, _now(), policy_id),
             )
         self.audit(project_id, "approval_signed", entity_type="approval", entity_id=approval_id,
                    detail={"stage": stage, "evidence_hash": evidence_hash, "signer_role": role, "policy_id": policy_id})
