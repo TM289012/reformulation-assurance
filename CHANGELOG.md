@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.9.0 (2026-08-14)
+
+The attach release: the analysis goes back to where formulators actually live. Prompted by feedback from a practicing formulator that a tool like this belongs as a feature of a bigger program rather than a standalone destination — and for this audience, the bigger program is the spreadsheet.
+
+- One-click Excel workbook export on the Approvals & dossier page: a single .xlsx with the whole project as tabs — experiments, recommendation batches, qualification gates, replicate summary, run- and formulation-level calibration (summaries and the frozen-prediction observations), robustness runs, approvals, and the audit trail, with a Read Me cover sheet carrying the scientific evidence SHA-256.
+- Workbook exports are recorded in the audit trail.
+- Landing page and README now lead with the attach-to-your-spreadsheet story: CSV or Excel in, files you keep out, no lock-in.
+
 ## v0.8.0 (2026-08-08)
 
 Signatures now preserve the exact evidence they covered. Previously a sign-off stored only the SHA-256 hash of the evidence bundle: enough to prove the evidence changed after signing, but not enough to show an auditor what was actually signed. Each signature now stores the full frozen canonical-JSON snapshot alongside the hash, adopting the practice recommended by Nicolas CARPi, maintainer of eLabFTW: sign a snapshot, store the snapshot with the signature, and never bind signatures to live data.

@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.8.0."""
+"""Streamlit application for Reformulation Assurance v0.9.0."""
 from __future__ import annotations
 
 import os
@@ -23,7 +23,7 @@ from closed_loop import (
     qualification_progress,
     refresh_after_result,
 )
-from dossier import evidence_snapshot_and_hash, generate_dossier
+from dossier import evidence_snapshot_and_hash, generate_dossier, generate_workbook
 from artifact_vault import ArtifactVault
 from backup_service import create_backup
 from notifications import deliver_queued_notifications
@@ -53,10 +53,10 @@ def _demo_mode_enabled() -> bool:
 
 DEMO_MODE = _demo_mode_enabled()
 
-st.set_page_config(page_title="Reformulation Assurance v0.8.0", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.9.0", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.8.0 · design → run → verify → qualify → approve → export")
+st.caption("v0.9.0 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
@@ -1400,6 +1400,33 @@ elif page == "Approvals & dossier":
             mime="application/zip",
             use_container_width=True,
         )
+    st.markdown("### Export Excel workbook")
+    st.write("One click, one .xlsx: experiments, recommendations, gates, calibration, robustness, approvals, and the audit trail as tabs. Your spreadsheet stays the system of record; this hands the analysis back.")
+    if st.button("Generate Excel workbook", use_container_width=True):
+        with st.spinner("Assembling workbook..."):
+            workbook_bytes, workbook_manifest = generate_workbook(
+                store,
+                project_id,
+                generated_by_user_id=current_user["id"],
+            )
+        st.session_state["workbook_download"] = {
+            "project_id": project_id,
+            "bytes": workbook_bytes,
+            "filename": f"{project['name'].lower().replace(' ', '_')}_workbench_export.xlsx",
+            "sheet_count": len(workbook_manifest["sheets"]),
+        }
+    workbook_download = st.session_state.get("workbook_download")
+    if workbook_download and workbook_download.get("project_id") == project_id:
+        st.success(f"Workbook ready: {workbook_download['sheet_count']} tabs.")
+        st.download_button(
+            "Download Excel workbook (.xlsx)",
+            data=workbook_download["bytes"],
+            file_name=workbook_download["filename"],
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+            key="workbook_download_button",
+        )
+
     dossiers = store.list_dossiers(project_id)
     if not dossiers.empty:
         st.markdown("### Generated dossier history")
