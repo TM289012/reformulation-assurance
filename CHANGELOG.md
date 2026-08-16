@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.8.0 (2026-08-07)
+## v0.8.0 (2026-08-08)
 
 Signatures now preserve the exact evidence they covered. Previously a sign-off stored only the SHA-256 hash of the evidence bundle: enough to prove the evidence changed after signing, but not enough to show an auditor what was actually signed. Each signature now stores the full frozen canonical-JSON snapshot alongside the hash, adopting the practice recommended by Nicolas CARPi, maintainer of eLabFTW: sign a snapshot, store the snapshot with the signature, and never bind signatures to live data.
 

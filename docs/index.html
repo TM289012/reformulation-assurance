@@ -43,6 +43,10 @@
   .apps h3 { font-size: 1rem; margin: 0 0 8px; }
   .apps p { color: var(--muted); font-size: 0.92rem; margin: 0 0 6px; }
   .apps a { color: var(--accent); }
+  .apps img.shot {
+    width: 100%; border: 1px solid var(--line); border-radius: 10px;
+    margin: 12px 0 14px; box-shadow: 0 1px 3px rgba(15, 118, 110, 0.06);
+  }
   footer { margin-top: 36px; font-size: 0.85rem; color: var(--muted); }
   footer a { color: var(--accent); }
   .privacy { margin-top: 6px; }
@@ -68,7 +72,9 @@
 
   <div class="apps">
     <h3>The full workbench</h3>
-    <p>These checkers are spin-offs from <a href="https://github.com/TM289012/reformulation-assurance">Reformulation Assurance</a>, an open-source workbench for ingredient-replacement projects: model-suggested experiments, staged qualification gates, and sign-offs bound to a hash of the evidence.</p>
+    <p>These checkers are spin-offs from <a href="https://github.com/TM289012/reformulation-assurance">Reformulation Assurance</a>, an open-source workbench for ingredient-replacement projects: model-suggested experiments, staged qualification gates, and sign-offs that store the exact frozen evidence they covered.</p>
+    <p><strong>It attaches to what you already use.</strong> Your spreadsheet stays the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything comes back out as files you keep — evidence tables, a printable dossier, the signed evidence snapshots. Local-first, no account, no lock-in.</p>
+    <img class="shot" src="assets/screenshotrecommendations.png" alt="A recommendation batch: purpose-diverse candidates with predictions, uncertainty, and an honest probability caption" loading="lazy">
     <p><a href="https://reformulation-assurance-demo.streamlit.app/">Try the live demo</a> — nothing to install, a cosmetics reformulation project preloaded.</p>
   </div>
 
