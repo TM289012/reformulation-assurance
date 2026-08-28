@@ -249,7 +249,7 @@ def _build_target(name: str, lo, hi, values: pd.Series):
     if lo is not None and hi is not None:
         bounds = (float(lo), float(hi))
         try:
-            return NumericalTarget.match_triangular(name, bounds), "match_triangular"
+            return NumericalTarget.match_triangular(name, cutoffs=bounds), "match_triangular"
         except Exception as exc:
             errors.append(f"match_triangular: {type(exc).__name__}: {exc}")
         try:
@@ -268,11 +268,11 @@ def _build_target(name: str, lo, hi, values: pd.Series):
             bounds = (bounds[0] - 1.0, bounds[1] + 1.0)
         try:
             return (
-                NumericalTarget.normalize_ramp(name, cutoffs=bounds, descending=descending),
-                "normalize_ramp",
+                NumericalTarget.normalized_ramp(name, cutoffs=bounds, descending=descending),
+                "normalized_ramp",
             )
         except Exception as exc:
-            errors.append(f"normalize_ramp: {type(exc).__name__}: {exc}")
+            errors.append(f"normalized_ramp: {type(exc).__name__}: {exc}")
         try:
             mode = "MIN" if descending else "MAX"
             return (
