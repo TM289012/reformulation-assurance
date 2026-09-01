@@ -227,6 +227,40 @@ def result_for_storage(result: Mapping[str, Any]) -> dict[str, Any]:
     return stored
 
 
+def wheeler_screen(values: list[float]) -> tuple[bool | None, int | None]:
+    """Leave-one-out consistency screen for a replicate group.
+
+    Follows Donald Wheeler's procedure for small replicate sets: judge each
+    value against natural limits (mean ± 2.66 × average moving range) computed
+    from the OTHER values in run order. Returns (consistent, flagged_index):
+    - (None, None) when there are fewer than 3 values (nothing to screen);
+    - (False, i) when value i falls outside the limits built from its siblings;
+    - (True, None) when every value is consistent with the rest.
+
+    With 3-6 values the screen is indicative, not definitive — the limits are
+    soft at these counts, which is exactly why it screens instead of verdicts.
+    """
+    n = len(values)
+    if n < 3:
+        return None, None
+    for i in range(n):
+        others = values[:i] + values[i + 1 :]
+        moving_ranges = [abs(others[j] - others[j - 1]) for j in range(1, len(others))]
+        if not moving_ranges:
+            continue
+        center = sum(others) / len(others)
+        mr_bar = sum(moving_ranges) / len(moving_ranges)
+        if mr_bar == 0.0:
+            if abs(values[i] - center) > 1e-12:
+                return False, i
+            continue
+        upper = center + 2.66 * mr_bar
+        lower = center - 2.66 * mr_bar
+        if values[i] > upper or values[i] < lower:
+            return False, i
+    return True, None
+
+
 def replicate_summary(
     store: ProjectStore,
     project_id: str,
@@ -251,11 +285,23 @@ def replicate_summary(
             if values.empty:
                 record[f"mean_{response}"] = np.nan
                 record[f"cv_{response}"] = np.nan
+                record[f"consistent_{response}"] = None
+                record[f"screen_note_{response}"] = ""
             else:
                 mean = float(values.mean())
                 std = float(values.std(ddof=1)) if len(values) > 1 else 0.0
                 record[f"mean_{response}"] = mean
                 record[f"cv_{response}"] = abs(std / mean) if abs(mean) > 1e-12 else np.nan
+                consistent, flagged = wheeler_screen([float(v) for v in values.tolist()])
+                record[f"consistent_{response}"] = consistent
+                if consistent is None:
+                    record[f"screen_note_{response}"] = "needs 3+ replicates to screen"
+                elif consistent is False:
+                    record[f"screen_note_{response}"] = (
+                        f"replicate #{(flagged or 0) + 1} inconsistent with the others"
+                    )
+                else:
+                    record[f"screen_note_{response}"] = "replicates consistent"
         records.append(record)
     return pd.DataFrame(records)
 

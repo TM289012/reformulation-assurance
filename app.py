@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.9.0."""
+"""Streamlit application for Reformulation Assurance v0.10.0."""
 from __future__ import annotations
 
 import os
@@ -53,10 +53,10 @@ def _demo_mode_enabled() -> bool:
 
 DEMO_MODE = _demo_mode_enabled()
 
-st.set_page_config(page_title="Reformulation Assurance v0.9.0", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.10.0", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.9.0 · design → run → verify → qualify → approve → export")
+st.caption("v0.10.0 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
@@ -1178,7 +1178,29 @@ elif page == "Qualification":
 
     if not progress["replicate_summary"].empty:
         st.markdown("### Replicate repeatability")
+        st.caption(
+            "Two-stage check, after Donald Wheeler: first each replicate is judged against "
+            "limits built from its siblings (the consistency screen), and only groups whose "
+            "replicates agree are scored on CV. With 3-6 replicates the screen is indicative, "
+            "not definitive."
+        )
         st.dataframe(progress["replicate_summary"], use_container_width=True, hide_index=True)
+        with st.expander("Running records — look before computing"):
+            replicate_experiments = store.list_experiments(project_id, source_type="recommended")
+            if not replicate_experiments.empty:
+                completed_runs = replicate_experiments[replicate_experiments["status"] == "completed"]
+                group_labels = sorted(
+                    str(g) for g in completed_runs.get("replicate_group", pd.Series(dtype=str)).dropna().unique()
+                )
+                if group_labels:
+                    chosen_group = st.selectbox("Replicate group", group_labels, key="running_record_group")
+                    group_frame = completed_runs[completed_runs["replicate_group"].astype(str) == chosen_group]
+                    response_names = [item["response"] for item in config["response_specs"]]
+                    for response_name in response_names:
+                        series = pd.to_numeric(group_frame.get(response_name), errors="coerce").dropna()
+                        if len(series) >= 2:
+                            st.caption(f"{response_name} — {len(series)} replicates in run order")
+                            st.line_chart(series.reset_index(drop=True))
 
     st.markdown("### Configure qualification gates")
     selected_stage = st.selectbox("Stage to configure", QUALIFICATION_STAGES)

@@ -227,9 +227,26 @@ def qualification_progress(store: ProjectStore, project_id: str) -> dict[str, An
             stage_groups = replicate_data[
                 replicate_data.get("qualification_stage", pd.Series(dtype=str)) == stage
             ] if not replicate_data.empty else pd.DataFrame()
+            screened_out: list[str] = []
             for _, group in stage_groups.iterrows():
                 if int(group.get("completed_replicates", 0)) < min_replicates:
                     continue
+                # Stage 1 (Wheeler screen): every judged response must have
+                # replicates consistent with each other before the CV means
+                # anything. A group with an inconsistent replicate cannot pass.
+                screen_ok = True
+                for response in cv_limits:
+                    consistent = group.get(f"consistent_{response}")
+                    if consistent is False:
+                        screen_ok = False
+                        note = str(group.get(f"screen_note_{response}", "")).strip()
+                        screened_out.append(
+                            f"group '{group.get('replicate_group')}' ({response}: {note or 'inconsistent replicate'})"
+                        )
+                        break
+                if not screen_ok:
+                    continue
+                # Stage 2: the CV check, now on replicates that agree.
                 cv_ok = True
                 for response, limit in cv_limits.items():
                     cv = group.get(f"cv_{response}")
@@ -241,8 +258,13 @@ def qualification_progress(store: ProjectStore, project_id: str) -> dict[str, An
             components.append(_ratio_progress(passing_groups, required_groups))
             if passing_groups < required_groups:
                 reasons.append(
-                    f"Needs {required_groups - passing_groups} replicate group(s) with at least {min_replicates} runs and acceptable CV"
+                    f"Needs {required_groups - passing_groups} replicate group(s) with at least {min_replicates} runs, consistent replicates, and acceptable CV"
                 )
+                if screened_out:
+                    reasons.append(
+                        "Replicate screen (per Wheeler): " + "; ".join(screened_out[:3])
+                        + (" …" if len(screened_out) > 3 else "")
+                    )
 
         min_robust = gate.get("minimum_robust_probability")
         if min_robust is not None:

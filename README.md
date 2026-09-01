@@ -26,7 +26,7 @@ The core loop:
 2. **Model** — Gaussian-process and random-forest models learn how your ingredients and process variables drive each specification.
 3. **Recommend** — the platform proposes a small, diverse batch of experiments, each with a stated purpose: best overall trade-off, highest modeled success, smallest change from your proven formula, most informative, lowest cost. Every candidate carries predictions, uncertainty, and extrapolation warnings.
 4. **Run and record** — you run the experiments in your lab and enter results. The models retrain after every result.
-5. **Qualify** — staged gates take a promising candidate through confirmation replicates, process-window studies, and supplier-lot variation, with robustness checked by Monte Carlo simulation of manufacturing variation.
+5. **Qualify** — staged gates take a promising candidate through confirmation replicates (each group is screened for an inconsistent replicate before its CV counts, following Donald Wheeler's small-sample procedure), process-window studies, and supplier-lot variation, with robustness checked by Monte Carlo simulation of manufacturing variation.
 6. **Approve and export** — approvals are electronic signatures bound to a SHA-256 hash of the exact evidence they were signed against, and the full frozen evidence snapshot is stored with every signature (the practice used by eLabFTW), so you can always show exactly what was signed. If the evidence changes afterward, the mismatch is visible. One click exports an audit-ready dossier: every experiment, prediction, calibration record, approval, signed snapshot, and the audit trail, with checksums.
 
 The part most tools skip is the honesty loop: predictions are frozen at recommendation time and scored against your actual lab results later — error, interval coverage, Brier scores — so the platform builds a track record you can check instead of asking for trust.
@@ -57,7 +57,7 @@ Then take the built-in tour — no data needed:
 3. **Approve and freeze batch**, then go to **Experiment loop**, mark an experiment completed, and enter plausible numbers (e.g. adhesion 8.5, viscosity 2300, dry time 35, gloss 90). Watch the models retrain.
 4. Open **Approvals & dossier**: the evidence hash has changed because the evidence did. Sign the discovery stage (it re-authenticates you and binds the signature to that exact hash), then export the dossier and look inside the zip.
 
-To run the test suite (35 tests):
+To run the test suite (45 tests):
 
 ```bash
 python -m unittest discover -s tests

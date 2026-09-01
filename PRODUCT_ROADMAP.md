@@ -2,6 +2,10 @@
 
 The project's goal at this stage is domain signal and honest evidence, not sales: get the workflow in front of real formulators and statisticians, collect criticism, and let the calibration pages prove or disprove the models in public.
 
+## Shipped: v0.10.0 — The Wheeler release (September 2026)
+
+The confirmation gate is now two-stage, following the procedure Donald J. Wheeler (2010 Deming Medalist) described in correspondence: look at the replicate running record first, judge any suspect value against limits computed from the other replicates, and only let the CV mean anything once the replicates agree. The drift checker also stopped issuing hollow all-clears below the small-sample floors of an XmR chart (first/last point can't flag below 6 values, middle points below 8, limits stabilize ~17+). See CHANGELOG.md.
+
 ## Shipped: v0.9.0 — Excel round-trip (August 2026)
 
 The workbench now hands the analysis back to spreadsheet-land: a one-click Excel workbook export with every evidence table as a tab and the evidence hash on the cover sheet. Import their workbook, analyze, and return everything as the file format formulators actually live in. Prompted by practitioner feedback that this belongs as a feature of the tools people already use, not a separate destination.
@@ -14,7 +18,7 @@ Sign-offs now store the full frozen evidence snapshot (canonical JSON) alongside
 
 The app is clickable in a browser with nothing to install (public demo sandbox), two standalone single-question tools serve the questions formulators hit mid-experiment (baseline drift, replicate noise), and the recommendation layer was benchmarked head-to-head against BayBE 0.15 with the protocol, biases, and results public. See CHANGELOG.md and the v0.7.0 release.
 
-## Next: v0.10 — Chemistry-aware suggestions (in design on branch `v08-slot-based`, named before renumbering)
+## Next: v0.11 — Chemistry-aware suggestions (in design on branch `v08-slot-based`, named before renumbering)
 
 - **Slot-based ingredient representation.** Instead of one column per candidate emulsifier, model the substitution question the way it is actually asked: one emulsifier slot choosing WHICH substance (BayBE `SubstanceParameter`, encoded from real molecular structures) and HOW MUCH, hybrid with traditional columns for everything else. Day-one spike is complete and on the branch (`v08_slot_spike.py`): five real molecules with PubChem-sourced SMILES (the polymeric legacy PEG as a disclosed representative oligomer), MORDRED descriptors, stateless recommender end to end.
 - **Optional BayBE ranking mode in the app.** The benchmark showed BayBE's recommender with a proper multi-target objective performs on par with the built-in ranking; offering it as an optional mode (own candidate pool via `SearchSpace.from_dataframe`, stateless `recommend`) is now justified. Behind an optional extras install (`baybe` pulls PyTorch); the core app stays light.

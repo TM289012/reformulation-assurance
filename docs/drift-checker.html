@@ -103,7 +103,7 @@
       <summary>How this works (and what it can't tell you)</summary>
       <p>This is an XmR individuals chart, the classic process-behavior chart (Shewhart; see Donald Wheeler's books). The limits are <i>mean &plusmn; 2.66 &times; average moving range</i>, computed from your own data. They describe how much routine, point-to-point noise your measurements already contain.</p>
       <p>Two signals are checked: <b>any point outside the limits</b> (something changed abruptly), and <b>8 or more consecutive points on the same side of the mean</b> (something is slowly drifting). If neither fires, the honest reading is that your variation looks routine and chasing individual ups and downs will just chase noise.</p>
-      <p>Limits: it assumes your values are in time order and describe one thing that should be stable. It won't detect drift smaller than your noise floor with few points, it doesn't model autocorrelation, and with fewer than 8 points the limits are provisional. A verdict here is a reason to look, not a root cause.</p>
+      <p>Limits: it assumes your values are in time order and describe one thing that should be stable. It won't detect drift smaller than your noise floor with few points, and it doesn't model autocorrelation. Small samples have hard floors (per Wheeler): the first or last point cannot flag before 6 values, a middle point cannot flag before 8, and the limits only stabilize around 17 or more — so below those counts this page says so instead of pretending. A verdict here is a reason to look, not a root cause.</p>
     </details>
   </div>
 
@@ -232,7 +232,8 @@ function render() {
   const notes = [];
   if (parsed.ignored) { notes.push(parsed.ignored + " non-numeric entr" + (parsed.ignored === 1 ? "y was" : "ies were") + " ignored."); }
   const provisional = result.n < 8;
-  if (provisional) { notes.push("Only " + result.n + " points — the limits are provisional; 8+ gives a reliable answer."); }
+  if (result.n >= 6 && provisional) { notes.push("At " + result.n + " points only the first and last value could flag; middle points need 8+."); }
+  if (result.n >= 8 && result.n < 17) { notes.push("Limits keep firming up until about 17 points; treat them as approximate at n=" + result.n + "."); }
 
   if (result.mrBar === 0) {
     verdict.className = "warn";
@@ -262,6 +263,11 @@ function render() {
     verdict.innerHTML = "<h2>Signal: this doesn't look like routine noise</h2>" +
       signals.map(function (t) { return "<p>" + t + "</p>"; }).join("") +
       "<p>Worth investigating before trusting comparisons against this baseline." +
+      (notes.length ? " " + notes.join(" ") : "") + "</p>";
+  } else if (result.n < 6) {
+    verdict.className = "warn";
+    verdict.innerHTML = "<h2>Too few points for this chart to say anything</h2>" +
+      "<p>With " + result.n + " values, XmR limits cannot flag the first or last point until you have 6, or a middle point until 8. A quiet chart here is not evidence of stability — it's just not enough data yet. Paste more history if you have it, or collect more before trusting this baseline." +
       (notes.length ? " " + notes.join(" ") : "") + "</p>";
   } else {
     verdict.className = provisional ? "warn" : "good";

@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.10.0 (2026-09-01)
+
+The Wheeler release: honest small-sample behavior, prompted by correspondence with Donald J. Wheeler (2010 Deming Medalist) on how to judge repeatability from three to six replicates. His procedure — look at the running record first, judge a suspect value against limits computed from the other replicates, and only then let the CV mean anything — is now how the confirmation gate works.
+
+- Replicate consistency screen: every replicate group is screened before its CV counts. Each value is judged against natural limits (mean ± 2.66 × average moving range) computed from the other replicates in run order; a group with an inconsistent replicate cannot pass a gate, and the gate's remaining-requirements text names the odd replicate. With 3-6 replicates the screen is indicative, not definitive, and says so.
+- Running records in the app: the Qualification page gains a "look before computing" expander that plots each replicate group's values in run order, per response.
+- Drift checker honesty at small n: XmR limits cannot flag the first or last point below 6 values or a middle point below 8, and limits only stabilize around 17+. The checker now says "too few points for this chart to say anything" instead of issuing a hollow all-clear below those floors, and labels 6-16 point verdicts as approximate.
+- Replicate Summary gains `consistent_<response>` and `screen_note_<response>` columns.
+- Test suite grows to 45.
+
 ## v0.9.0 (2026-08-14)
 
 The attach release: the analysis goes back to where formulators actually live. Prompted by feedback from a practicing formulator that a tool like this belongs as a feature of a bigger program rather than a standalone destination — and for this audience, the bigger program is the spreadsheet.
