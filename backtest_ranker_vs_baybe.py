@@ -239,15 +239,26 @@ def pick_ours(rng, measurements, remaining, config) -> int:
 def _build_target(name: str, lo, hi, values: pd.Series):
     """Construct one normalized BayBE target, tolerant of 0.15 API variants.
 
-    Tries the modern constructors first, then the legacy ones that the
-    deprecation policy keeps alive. Returns (target, how) where `how` records
-    which constructor worked, for honest reporting.
+    Tries the smooth modern constructors first (maintainer advice: bell and
+    sigmoid give the optimizer smooth gradients, unlike the kinked triangular
+    and ramp shapes), then the piecewise modern constructors, then the legacy
+    ones that the deprecation policy keeps alive. Returns (target, how) where
+    `how` records which constructor worked, for honest reporting.
     """
     from baybe.targets import NumericalTarget
 
     errors: list[str] = []
     if lo is not None and hi is not None:
         bounds = (float(lo), float(hi))
+        try:
+            center = (bounds[0] + bounds[1]) / 2.0
+            sigma = (bounds[1] - bounds[0]) / 4.0  # spec edges sit at 2*sigma
+            return (
+                NumericalTarget.match_bell(name, match_value=center, sigma=sigma),
+                "match_bell",
+            )
+        except Exception as exc:
+            errors.append(f"match_bell: {type(exc).__name__}: {exc}")
         try:
             return NumericalTarget.match_triangular(name, cutoffs=bounds), "match_triangular"
         except Exception as exc:
@@ -266,6 +277,19 @@ def _build_target(name: str, lo, hi, values: pd.Series):
         bounds = (min(cut, extreme), max(cut, extreme))
         if bounds[0] == bounds[1]:
             bounds = (bounds[0] - 1.0, bounds[1] + 1.0)
+        try:
+            # Anchor ordinates must lie in the open interval (0, 1); 0.05/0.95
+            # gives a gentle S-curve that tracks the old ramp between the cutoffs.
+            if descending:
+                anchors = [(bounds[0], 0.95), (bounds[1], 0.05)]
+            else:
+                anchors = [(bounds[0], 0.05), (bounds[1], 0.95)]
+            return (
+                NumericalTarget.normalized_sigmoid(name, anchors),
+                "normalized_sigmoid",
+            )
+        except Exception as exc:
+            errors.append(f"normalized_sigmoid: {type(exc).__name__}: {exc}")
         try:
             return (
                 NumericalTarget.normalized_ramp(name, cutoffs=bounds, descending=descending),
