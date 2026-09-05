@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.10.0."""
+"""Streamlit application for Reformulation Assurance v0.11.0."""
 from __future__ import annotations
 
 import os
@@ -24,6 +24,7 @@ from closed_loop import (
     refresh_after_result,
 )
 from dossier import evidence_snapshot_and_hash, generate_dossier, generate_workbook
+from eln_export import ELN_MEDIA_TYPE, generate_eln
 from artifact_vault import ArtifactVault
 from backup_service import create_backup
 from notifications import deliver_queued_notifications
@@ -53,10 +54,10 @@ def _demo_mode_enabled() -> bool:
 
 DEMO_MODE = _demo_mode_enabled()
 
-st.set_page_config(page_title="Reformulation Assurance v0.10.0", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.11.0", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.10.0 · design → run → verify → qualify → approve → export")
+st.caption("v0.11.0 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
@@ -1447,6 +1448,52 @@ elif page == "Approvals & dossier":
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
             key="workbook_download_button",
+        )
+
+    st.markdown("### Export to your lab notebook (.eln)")
+    st.write(
+        "One .eln file, the ELN Consortium's open archive format: the dossier lands in eLabFTW, RSpace "
+        "or any other notebook that imports .eln as a single experiment entry, with every evidence table, "
+        "the scientific-evidence JSON, the signed snapshots and the Excel workbook attached and their "
+        "SHA-256 hashes written into the entry's metadata."
+    )
+    eln_with_workbook = st.checkbox("Attach the Excel workbook", value=True, key="eln_include_workbook")
+    if st.button("Generate .eln archive", use_container_width=True):
+        with st.spinner("Assembling notebook archive..."):
+            try:
+                eln_bytes, eln_manifest = generate_eln(
+                    store,
+                    project_id,
+                    generated_by_user_id=current_user["id"],
+                    include_workbook=eln_with_workbook,
+                )
+                st.session_state["eln_download"] = {
+                    "project_id": project_id,
+                    "bytes": eln_bytes,
+                    "manifest": eln_manifest,
+                }
+            except Exception as exc:
+                st.error(str(exc))
+    eln_download = st.session_state.get("eln_download")
+    if eln_download and eln_download.get("project_id") == project_id:
+        eln_manifest = eln_download["manifest"]
+        st.success(
+            f"Notebook archive ready: dossier v{eln_manifest['dossier_version']}, "
+            f"{eln_manifest['file_count']} attached files. "
+            f"Evidence hash: {eln_manifest['scientific_evidence_sha256'][:16]}…"
+        )
+        st.download_button(
+            "Download .eln archive",
+            data=eln_download["bytes"],
+            file_name=eln_manifest["archive_name"],
+            mime=ELN_MEDIA_TYPE,
+            use_container_width=True,
+            key="eln_download_button",
+        )
+        st.caption(
+            "Import it from your notebook's import page (eLabFTW: Import → .eln). "
+            "The entry's extra fields carry the evidence hash; sha256sum of the attached "
+            "scientific_evidence.canonical.json reproduces it."
         )
 
     dossiers = store.list_dossiers(project_id)

@@ -10,7 +10,7 @@ Reformulation Assurance is an open-source, local-first workbench for ingredient-
 
 It runs entirely on your machine. Your formulations live in a SQLite file you own. Nothing is uploaded anywhere, there is no telemetry, and there is no cloud account — which matters, because formulations are usually the most confidential thing a company has.
 
-**It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep — CSV evidence tables, a printable dossier, and the signed evidence snapshots. Local files in, local files out, no lock-in.
+**It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep — CSV evidence tables, a printable dossier, the signed evidence snapshots, an Excel workbook, or a single `.eln` archive that imports into eLabFTW, RSpace and other lab notebooks as one entry. Local files in, local files out, no lock-in.
 
 ![Demo: generate a batch, record a result, sign the evidence, export the dossier](assets/demo.gif)
 
@@ -27,7 +27,7 @@ The core loop:
 3. **Recommend** — the platform proposes a small, diverse batch of experiments, each with a stated purpose: best overall trade-off, highest modeled success, smallest change from your proven formula, most informative, lowest cost. Every candidate carries predictions, uncertainty, and extrapolation warnings.
 4. **Run and record** — you run the experiments in your lab and enter results. The models retrain after every result.
 5. **Qualify** — staged gates take a promising candidate through confirmation replicates (each group is screened for an inconsistent replicate before its CV counts, following Donald Wheeler's small-sample procedure), process-window studies, and supplier-lot variation, with robustness checked by Monte Carlo simulation of manufacturing variation.
-6. **Approve and export** — approvals are electronic signatures bound to a SHA-256 hash of the exact evidence they were signed against, and the full frozen evidence snapshot is stored with every signature (the practice used by eLabFTW), so you can always show exactly what was signed. If the evidence changes afterward, the mismatch is visible. One click exports an audit-ready dossier: every experiment, prediction, calibration record, approval, signed snapshot, and the audit trail, with checksums.
+6. **Approve and export** — approvals are electronic signatures bound to a SHA-256 hash of the exact evidence they were signed against, and the full frozen evidence snapshot is stored with every signature (the practice used by eLabFTW), so you can always show exactly what was signed. If the evidence changes afterward, the mismatch is visible. One click exports an audit-ready dossier: every experiment, prediction, calibration record, approval, signed snapshot, and the audit trail, with checksums — as a ZIP, an Excel workbook, or a `.eln` notebook archive whose metadata carries the SHA-256 of every attached file.
 
 The part most tools skip is the honesty loop: predictions are frozen at recommendation time and scored against your actual lab results later — error, interval coverage, Brier scores — so the platform builds a track record you can check instead of asking for trust.
 
@@ -57,7 +57,7 @@ Then take the built-in tour — no data needed:
 3. **Approve and freeze batch**, then go to **Experiment loop**, mark an experiment completed, and enter plausible numbers (e.g. adhesion 8.5, viscosity 2300, dry time 35, gloss 90). Watch the models retrain.
 4. Open **Approvals & dossier**: the evidence hash has changed because the evidence did. Sign the discovery stage (it re-authenticates you and binds the signature to that exact hash), then export the dossier and look inside the zip.
 
-To run the test suite (45 tests):
+To run the test suite (52 tests):
 
 ```bash
 python -m unittest discover -s tests
@@ -115,6 +115,7 @@ This is a pilot-stage prototype, and the boundaries are stated rather than impli
 - `process_window.py` — bounded process-window study designs
 - `project_store.py` / `product_store.py` / `pilot_store.py` — layered SQLite store: scientific ledger → organizations and approvals → collaboration and operations
 - `dossier.py` — evidence hashing and dossier export
+- `eln_export.py` — `.eln` (RO-Crate) notebook archive export and CLI
 - `security.py`, `artifact_vault.py`, `backup_service.py` — password hashing, encrypted artifacts, verified backups
 
 More detail in [ARCHITECTURE.md](ARCHITECTURE.md); version history in [CHANGELOG.md](CHANGELOG.md).
