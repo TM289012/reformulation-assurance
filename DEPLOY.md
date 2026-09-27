@@ -50,13 +50,13 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
    ```toml
    REFORMULATION_SMTP_HOST = "smtp.gmail.com"
-   REFORMULATION_SMTP_PORT = "587"
+   REFORMULATION_SMTP_PORT = "465"
    REFORMULATION_SMTP_USERNAME = "you@gmail.com"
    REFORMULATION_SMTP_PASSWORD = "the 16-character app password"
    REFORMULATION_EMAIL_FROM = "you@gmail.com"
    ```
 
-   The app password comes from Google Account → Security → 2-Step Verification → App passwords (2-step verification must be on; the normal account password is refused). Then open the Team page and press **Send a test email** to yourself: the page reports success, or the exact reason the server gave. If port 587 times out on your host, try `REFORMULATION_SMTP_PORT = "465"`.
+   Port 465 (TLS from the first byte) is the one that works from Community Cloud; its network cuts off port 587 connections before the server answers. The app password comes from Google Account → Security → 2-Step Verification → App passwords (2-step verification must be on; the normal account password is refused). Then open the Team page and press **Send a test email** to yourself: the page reports success, or the exact reason the server gave, and *Retry failed messages* resends anything that failed before the settings were right.
 
 3. **Create the first workspace.** Open the app. Because the database is empty you get the *Create the first workspace owner* form; this account is simply the first owner, it has no special powers over other workspaces. Then confirm the sign-in screen shows four tabs: *Sign in*, *Create a workspace*, *Accept invitation*, *Reset password*.
 

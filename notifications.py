@@ -110,9 +110,15 @@ def _explain(exc: BaseException, settings: SMTPSettings) -> str:
             )
         return f"TLS handshake with {where} failed. Detail: {exc}"
     if isinstance(exc, smtplib.SMTPServerDisconnected):
+        if settings.port == 465 and not settings.use_ssl:
+            return (
+                f"{where} closed the connection: port 465 expects TLS from the first byte. Remove "
+                "REFORMULATION_SMTP_SSL=false (port 465 selects implicit TLS by itself) or set it to true."
+            )
         return (
-            f"{where} closed the connection before the message was accepted. If the port is 465, the server expects "
-            "TLS from the first byte (set REFORMULATION_SMTP_SSL=true or use port 465 with the default). Detail: "
+            f"{where} closed the connection before the message was accepted. From a hosted platform this usually "
+            f"means plain connections on port {settings.port} are cut off on the way out; set "
+            "REFORMULATION_SMTP_PORT=465, which encrypts from the first byte. Detail: "
             f"{exc}"
         )
     if isinstance(exc, (socket.timeout, TimeoutError)):
