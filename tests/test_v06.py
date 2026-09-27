@@ -6,7 +6,13 @@ from zipfile import ZipFile
 import hashlib
 import json
 import tempfile
+import os
 import unittest
+
+SQLITE_ONLY = unittest.skipIf(
+    os.environ.get("REFORMULATION_FORCE_DATABASE_URL"),
+    "exercises the local SQLite file directly",
+)
 
 import pandas as pd
 
@@ -189,8 +195,17 @@ class V06ArtifactBackupMigrationTests(V06PilotFixture):
         recovered, record = self.vault.retrieve_project_artifact(self.store, artifact_id, self.owner)
         self.assertEqual(recovered, dossier)
         self.assertEqual(hashlib.sha256(recovered).hexdigest(), record["plaintext_sha256"])
-        self.assertNotEqual(Path(record["storage_path"]).read_bytes(), dossier)
+        # Ciphertext at rest is never the plaintext, wherever it is kept.
+        if record["storage_path"].startswith("database://"):
+            with self.store.connection() as con:
+                stored = con.execute(
+                    "SELECT ciphertext FROM encrypted_artifacts WHERE id = ?", (artifact_id,)
+                ).fetchone()["ciphertext"]
+            self.assertNotEqual(bytes(stored), dossier)
+        else:
+            self.assertNotEqual(Path(record["storage_path"]).read_bytes(), dossier)
 
+    @SQLITE_ONLY
     def test_verified_backup_and_restore(self):
         backup_id, _ = create_backup(
             self.store,
@@ -205,6 +220,7 @@ class V06ArtifactBackupMigrationTests(V06PilotFixture):
         restored_store = PilotStore(restored)
         self.assertEqual(len(restored_store.list_projects(self.org)), 1)
 
+    @SQLITE_ONLY
     def test_postgres_migration_bundle_is_checksummed(self):
         payload, manifest = create_postgres_migration_bundle(self.store.database_path)
         self.assertGreater(manifest["table_counts"]["projects"], 0)

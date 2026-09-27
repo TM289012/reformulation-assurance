@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reformulation Assurance for courses — a formulation lab students can run in a browser</title>
+<meta name="description" content="Run an ingredient-replacement project as a course lab: students design experiments, record results, watch models retrain, and sign evidence. Instructors see every project's progress in one table. Free and open source.">
+<link rel="canonical" href="https://tm289012.github.io/reformulation-assurance/for-courses.html">
+<meta property="og:title" content="Reformulation Assurance for courses">
+<meta property="og:description" content="A formulation lab students can run in a browser, with an instructor overview and a gradable, tamper-evident deliverable.">
+<meta property="og:url" content="https://tm289012.github.io/reformulation-assurance/for-courses.html">
+<meta property="og:type" content="website">
+<style>
+  :root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --accent: #0f766e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px 16px 64px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); line-height: 1.55; background: #f9fafb linear-gradient(180deg, #f0fdfa 0%, #f9fafb 260px) no-repeat; }
+  main { max-width: 760px; margin: 0 auto; }
+  .eyebrow { display: inline-block; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+  h1 { font-size: 2rem; margin: 0 0 8px; }
+  h2 { font-size: 1.25rem; margin: 32px 0 8px; color: var(--accent); }
+  .tagline { color: var(--muted); margin: 0 0 24px; font-size: 1.08rem; max-width: 640px; }
+  p, li { font-size: 0.98rem; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin: 14px 0; box-shadow: 0 1px 3px rgba(15, 118, 110, 0.06); }
+  .card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  .card p { margin: 0 0 6px; color: var(--muted); }
+  ol li, ul li { margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; background: #fff; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f0fdfa; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+  a { color: var(--accent); }
+  footer { margin-top: 36px; font-size: 0.85rem; color: var(--muted); }
+  .note { border-left: 3px solid var(--accent); padding: 8px 14px; background: #fff; color: var(--muted); margin: 16px 0; }
+</style>
+</head>
+<body>
+<main>
+  <span class="eyebrow">Reformulation Assurance</span>
+  <h1>For courses</h1>
+  <p class="tagline">An ingredient-replacement project students run end to end in a browser: design the next experiments, record results, watch the models retrain, judge replicates the way a statistician would, and sign evidence that cannot be quietly edited afterwards. You watch the whole section from one table.</p>
+
+  <h2>What students actually do</h2>
+  <p>The scenario is the one working formulators face most often: a supplier discontinues an ingredient and the replacement has to be qualified against the original specifications. The built-in dataset is a coatings project with 72 historical lots, 11 of which failed before they could be measured; a cosmetics emulsifier-swap dataset (88 lots, 7 failed) ships alongside and is the one preloaded in the public demo. Students can also bring their own lot history as a CSV or Excel file.</p>
+  <div class="card">
+    <h3>A two-hour guided lab (no wet chemistry needed)</h3>
+    <ol>
+      <li><strong>Read the history.</strong> Create the demo project and open the same history as a spreadsheet. What were the failure reasons, and what did the failed lots have in common in process conditions and supplier? (Project overview, the CSV.)</li>
+      <li><strong>Design a batch.</strong> Generate a recommendation batch: five candidates with different purposes, each with a prediction, an uncertainty and a probability of meeting all specs, plus the caption that says what that probability does and does not mean. Students write one sentence per candidate on why the model chose it. (Recommendations.)</li>
+      <li><strong>Run it on paper.</strong> Approve and freeze the batch, then enter plausible results for each candidate as if the lab had run them. The models retrain; the calibration page now has real prospective points. (Experiment loop, Calibration.)</li>
+      <li><strong>Judge the replicates.</strong> Enter three replicates for one candidate, one of them deliberately off. The confirmation gate refuses to pass it and names the odd replicate, following Wheeler's running-record procedure. Students explain why a coefficient of variation alone would have been fooled. (Qualification.)</li>
+      <li><strong>Sign and export.</strong> Sign the discovery stage; the signature binds to the SHA-256 of the exact evidence. Export the dossier. Change one result, and the dossier shows the signature as stale. (Approvals &amp; dossier.)</li>
+    </ol>
+  </div>
+  <p>A printable student worksheet with the steps, five questions and a hand-in list: <a href="lab-worksheet.html">lab-worksheet.html</a>. A semester project replaces step 3 with real bench work: students run the batch the tool proposes, record measured results, and iterate through the qualification stages for real.</p>
+
+  <h2>What you see</h2>
+  <p>The <strong>Workspace overview</strong> page lists every project in the section: who started it, imported lots, planned and completed experiments, batches, gates passed out of six, the qualification progress score, signed approvals, dossier exports and the last activity time, with a CSV download for your gradebook. The progress score is the same number students see on their own Qualification page, so the number they chase is the number you grade.</p>
+
+  <h2>Setting up a section (about ten minutes)</h2>
+  <ol>
+    <li>Create a workspace named after the section, for example <code>CHEM 3410 Fall 2026</code>. On a hosted instance that is the <em>Create a workspace</em> tab; on a departmental install it is the first-owner form.</li>
+    <li>On the <strong>Team</strong> page, paste the roster into <em>Invite a class or a team at once</em>. Everyone gets a personal link (two-week validity by default); the table of links downloads as CSV for your LMS announcement, and the links also go out by email when the instance has mail configured.</li>
+    <li>Students open their link, choose a password, and land in the section with the <em>scientist</em> role: they can create projects and record results, but cannot sign approvals or change the team.</li>
+    <li>Each student or team starts a project: <strong>New project → Start with demo</strong> for the guided lab, or <strong>Import your CSV</strong> for their own data.</li>
+  </ol>
+  <div class="note">Everything in a workspace is visible to its members, which suits team projects and peer review. If students must not see each other's work, give each team its own workspace; creating one takes a minute.</div>
+
+  <h2>A rubric that matches what the tool records</h2>
+  <table>
+    <tr><th>Evidence</th><th>Where it comes from</th><th>What a strong submission shows</th></tr>
+    <tr><td>Reading of the history</td><td>Worksheet Q1, the CSV</td><td>Names the failure reasons and the process and supplier pattern behind them</td></tr>
+    <tr><td>Batch design reasoning</td><td>Recommendations page, write-up</td><td>Explains each candidate's purpose and treats the probability as a model output, not a promise</td></tr>
+    <tr><td>Replicate judgement</td><td>Qualification page</td><td>Recognizes an inconsistent replicate and says why the screen precedes the CV</td></tr>
+    <tr><td>Qualification progress</td><td>Workspace overview (score, gates passed)</td><td>Gates passed with the required completed and compliant runs, not by lowering the gates</td></tr>
+    <tr><td>Deliverable integrity</td><td>Dossier or <code>.eln</code> archive</td><td>Evidence hash in the dossier matches the signed approval; no stale signatures</td></tr>
+  </table>
+
+  <h2>Cost and support</h2>
+  <p>The software is free and open source (MIT). A department can run it on its own machine or server from the <a href="https://github.com/TM289012/reformulation-assurance#quickstart-about-10-minutes">quickstart</a>, or use a hosted section so students install nothing. Setting up a hosted section for a course, walking through the lab with you once, and being on call during the term is available; the first two sections to pilot the lab get that free in exchange for candid feedback on what confused students.</p>
+  <p>Questions, or want a walkthrough before committing a syllabus slot? <a href="https://github.com/TM289012/reformulation-assurance/issues">Open an issue</a> or reply to the email that brought you here.</p>
+
+  <footer>
+    Free and open-source (MIT) · <a href="https://github.com/TM289012/reformulation-assurance">Source on GitHub</a> · <a href="index.html">Free checkers</a>
+  </footer>
+</main>
+</body>
+</html>

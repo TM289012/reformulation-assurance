@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.11.0."""
+"""Streamlit application for Reformulation Assurance v0.12.0."""
 from __future__ import annotations
 
 import os
@@ -31,6 +31,7 @@ from notifications import deliver_queued_notifications
 from postgres_migration import create_postgres_migration_bundle
 from ingestion import import_readiness_report, load_table, workbook_preview
 from pilot_store import ADMIN_ROLES, APPROVAL_ROLES, EDIT_ROLES, PilotStore, ROLES, PRIORITIES, TASK_STATUSES
+from product_store import TooManyAttempts
 from reformulation_engine import infer_numeric_bounds
 from process_window import DESIGN_MODES, design_process_window
 
@@ -41,34 +42,54 @@ ARTIFACT_ROOT = Path(os.environ.get("REFORMULATION_ARTIFACT_ROOT", APP_DIR / "da
 DEMO_FILE = APP_DIR / "demo_coatings_reformulation.csv"
 
 
+def _setting(name: str, default: str = "") -> str:
+    """Read a deployment setting from the environment, then Streamlit secrets."""
+    value = os.environ.get(name, "")
+    if not value:
+        try:
+            value = str(st.secrets.get(name, ""))
+        except Exception:
+            value = ""
+    return value or default
+
+
+def _flag(name: str) -> bool:
+    return _setting(name).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _demo_mode_enabled() -> bool:
     """Public-sandbox mode, set via env var or Streamlit secrets. Off by default."""
-    flag = os.environ.get("REFORMULATION_DEMO_MODE", "")
-    if not flag:
-        try:
-            flag = str(st.secrets.get("REFORMULATION_DEMO_MODE", ""))
-        except Exception:
-            flag = ""
-    return flag.strip().lower() in {"1", "true", "yes", "on"}
+    return _flag("REFORMULATION_DEMO_MODE")
 
 
 DEMO_MODE = _demo_mode_enabled()
+# Hosted deployment: a PostgreSQL URL replaces the local SQLite file.
+DATABASE_URL = _setting("REFORMULATION_DATABASE_URL").strip()
+# Self-serve workspaces: anyone can create an organization (hosted tier). Off by default,
+# so a private/local install still has exactly one owner-created workspace.
+OPEN_SIGNUP = _flag("REFORMULATION_OPEN_SIGNUP")
+PUBLIC_URL = _setting("REFORMULATION_PUBLIC_URL", "http://localhost:8501")
 
-st.set_page_config(page_title="Reformulation Assurance v0.11.0", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.12.0", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.11.0 · design → run → verify → qualify → approve → export")
+st.caption("v0.12.0 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
 @st.cache_resource
 def get_store() -> PilotStore:
-    return PilotStore(DEFAULT_DB)
+    return PilotStore(DATABASE_URL or DEFAULT_DB)
+
+
+ARTIFACT_KEY = _setting("REFORMULATION_ARTIFACT_KEY").strip()
 
 
 @st.cache_resource
 def get_vault() -> ArtifactVault:
-    return ArtifactVault(ARTIFACT_ROOT)
+    # On a hosted deployment the local disk is disposable, so the encryption key must
+    # come from settings; a generated key file would vanish at the next redeploy.
+    return ArtifactVault(ARTIFACT_ROOT, key=ARTIFACT_KEY or None)
 
 
 store = get_store()
@@ -109,7 +130,10 @@ def authentication_screen() -> dict[str, Any]:
             "app locally so data stays on your machine."
         )
         if st.button("Enter the demo", type="primary", use_container_width=True):
-            demo_user = store.authenticate(DEMO_OWNER_EMAIL, DEMO_OWNER_PASSWORD)
+            try:
+                demo_user = store.authenticate(DEMO_OWNER_EMAIL, DEMO_OWNER_PASSWORD)
+            except TooManyAttempts:
+                demo_user = None
             if demo_user:
                 st.session_state["current_user"] = demo_user
                 st.rerun()
@@ -152,18 +176,56 @@ def authentication_screen() -> dict[str, Any]:
 
     invite_default = str(st.query_params.get("invite", ""))
     reset_default = str(st.query_params.get("reset", ""))
-    sign_in_tab, invite_tab, reset_tab = st.tabs(["Sign in", "Accept invitation", "Reset password"])
+    tab_labels = ["Sign in", "Accept invitation", "Reset password"]
+    if OPEN_SIGNUP:
+        tab_labels.insert(1, "Create a workspace")
+    tabs = st.tabs(tab_labels)
+    sign_in_tab = tabs[0]
+    signup_tab = tabs[1] if OPEN_SIGNUP else None
+    invite_tab = tabs[2] if OPEN_SIGNUP else tabs[1]
+    reset_tab = tabs[3] if OPEN_SIGNUP else tabs[2]
+    if signup_tab is not None:
+        with signup_tab:
+            st.write(
+                "A workspace is your lab's private space: its own projects, members and audit trail. "
+                "You become its owner and can invite colleagues or students from the Team page."
+            )
+            with st.form("create_workspace"):
+                new_org = st.text_input("Workspace name", placeholder="e.g. Enfleur lab, or CHEM 3410 Fall 2026")
+                new_name = st.text_input("Your full name")
+                new_email = st.text_input("Email")
+                new_password = st.text_input("Password", type="password", help="At least 10 characters, including a letter and number.")
+                new_confirm = st.text_input("Confirm password", type="password")
+                created = st.form_submit_button("Create workspace", type="primary", use_container_width=True)
+            if created:
+                if new_password != new_confirm:
+                    st.error("Passwords do not match.")
+                else:
+                    try:
+                        user_id, organization_id = store.register_owner(
+                            email=new_email, display_name=new_name, password=new_password,
+                            organization_name=new_org,
+                        )
+                        st.session_state["current_user"] = store.get_user(user_id)
+                        st.session_state["active_organization_id"] = organization_id
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(str(exc))
     with sign_in_tab:
         with st.form("login"):
             email = st.text_input("Email", key="login_email")
             password = st.text_input("Password", type="password", key="login_password")
             submitted = st.form_submit_button("Sign in", type="primary", use_container_width=True)
         if submitted:
-            authenticated = store.authenticate(email, password)
-            if authenticated:
-                st.session_state["current_user"] = authenticated
-                st.rerun()
-            st.error("Email or password is incorrect.")
+            try:
+                authenticated = store.authenticate(email, password)
+            except TooManyAttempts as exc:
+                st.error(str(exc))
+            else:
+                if authenticated:
+                    st.session_state["current_user"] = authenticated
+                    st.rerun()
+                st.error("Email or password is incorrect.")
 
     with invite_tab:
         with st.form("accept_invitation"):
@@ -189,7 +251,7 @@ def authentication_screen() -> dict[str, Any]:
             reset_email = st.text_input("Account email")
             requested = st.form_submit_button("Create reset link")
         if requested:
-            store.request_password_reset(reset_email, base_url=os.environ.get("REFORMULATION_PUBLIC_URL", "http://localhost:8501"))
+            store.request_password_reset(reset_email, base_url=PUBLIC_URL)
             st.success("If the account exists, a reset message was added to the email outbox.")
         st.markdown("#### Use a reset token")
         with st.form("complete_reset"):
@@ -230,6 +292,12 @@ if DEMO_MODE:
     st.warning(
         "Public demo sandbox — shared with other visitors, resets periodically. "
         "Explore freely; don't enter anything real."
+    )
+if DATABASE_URL and not ARTIFACT_KEY and can_admin:
+    st.error(
+        "Hosted deployment without REFORMULATION_ARTIFACT_KEY: encrypted exports are being "
+        "locked with a key kept on this server's disposable disk and will become unreadable "
+        "at the next redeploy. Set the key in the deployment secrets before storing anything."
     )
 show_flash()
 
@@ -347,7 +415,7 @@ with st.sidebar:
     if can_edit:
         pages.append("New project")
     if can_admin:
-        pages.extend(["Team", "Pilot operations"])
+        pages.extend(["Team", "Workspace overview", "Pilot operations"])
     page = st.radio("Go to", pages)
     if st.button("Sign out", use_container_width=True):
         for key in ["current_user", "active_organization_id", "active_project_id", "dossier_download"]:
@@ -374,13 +442,47 @@ if page == "Team":
                 email=email,
                 role=role,
                 actor_user_id=current_user["id"],
-                base_url=os.environ.get("REFORMULATION_PUBLIC_URL", "http://localhost:8501"),
+                base_url=PUBLIC_URL,
                 expires_hours=int(expires_hours),
             )
             st.success("Invitation created and queued for delivery.")
             st.code(invitation["invite_url"])
         except Exception as exc:
             st.error(str(exc))
+    st.markdown("### Invite a class or a team at once")
+    st.caption(
+        "Paste a roster, one address per line (commas work too). Everyone gets their own invitation link; "
+        "the table below is yours to paste into a course announcement or an email, and the links also go to the outbox."
+    )
+    with st.form("invite_roster"):
+        roster_text = st.text_area("Email addresses", height=140, placeholder="student.one@university.edu\nstudent.two@university.edu")
+        roster_role = st.selectbox("Role for everyone on the list", list(ROLES), index=list(ROLES).index("scientist"), key="roster_role")
+        roster_hours = st.number_input("Invitation validity (hours)", min_value=1, max_value=720, value=336, key="roster_hours")
+        roster_submitted = st.form_submit_button("Create invitations")
+    if roster_submitted:
+        emails = store.parse_email_list(roster_text)
+        if not emails:
+            st.error("No email addresses found.")
+        else:
+            roster = store.create_invitations(
+                organization_id, emails=emails, role=roster_role, actor_user_id=current_user["id"],
+                base_url=PUBLIC_URL, expires_hours=int(roster_hours),
+            )
+            st.session_state["roster_result"] = roster
+    roster_result = st.session_state.get("roster_result")
+    if roster_result is not None and not roster_result.empty:
+        invited = int((roster_result["status"] == "invited").sum())
+        st.success(f"{invited} invitation(s) created, {len(roster_result) - invited} skipped.")
+        st.dataframe(
+            roster_result, use_container_width=True, hide_index=True,
+            column_config={"invite_url": st.column_config.LinkColumn("Invitation link")},
+        )
+        st.download_button(
+            "Download invitation list (CSV)",
+            data=roster_result.to_csv(index=False).encode("utf-8"),
+            file_name="invitations.csv",
+            mime="text/csv",
+        )
     invitations = store.list_invitations(organization_id, current_user["id"])
     if not invitations.empty:
         st.markdown("### Invitation history")
@@ -650,6 +752,77 @@ if page == "Collaboration":
                 except Exception as exc:
                     st.error(str(exc))
 
+elif page == "Workspace overview":
+    st.header("Workspace overview")
+    st.caption(
+        "Every project in this workspace at a glance: who started it, how far it has got through the "
+        "qualification gates, and when it was last touched. Built for instructors running a course section "
+        "and for team leads; the CSV is the gradebook export."
+    )
+    overview = store.workspace_overview(organization_id, current_user["id"])
+    if overview.empty:
+        st.info("No projects yet. Members create projects from the New project page; they will show up here.")
+    else:
+        progress_rows = []
+        for project_row in overview.to_dict("records"):
+            try:
+                progress = qualification_progress(store, str(project_row["id"]))
+                stages = progress["stage_progress"]
+                passed = int(stages["gate_passed"].sum()) if not stages.empty else 0
+                score = float(progress["score"])
+            except Exception:  # a half-configured project should not break the whole page
+                passed, score = 0, float("nan")
+            progress_rows.append({"gates_passed": passed, "progress": score})
+        table = pd.concat([overview.reset_index(drop=True), pd.DataFrame(progress_rows)], axis=1)
+        display_columns = [
+            "name", "created_by", "created_by_email", "historical_rows", "recommended_experiments",
+            "completed_experiments", "batches", "gates_passed", "progress", "approvals", "dossier_exports",
+            "last_activity", "created_at",
+        ]
+        left, middle, right = st.columns(3)
+        left.metric("Projects", len(table))
+        middle.metric("Completed experiments", int(table["completed_experiments"].sum()))
+        right.metric("Projects with a signed approval", int((table["approvals"] > 0).sum()))
+        st.dataframe(
+            table[display_columns],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "progress": st.column_config.ProgressColumn("Qualification progress", min_value=0.0, max_value=1.0, format="%.0f%%"),
+                "gates_passed": st.column_config.NumberColumn("Gates passed (of 6)"),
+                "historical_rows": "Imported lots",
+                "recommended_experiments": "Planned",
+                "completed_experiments": "Completed",
+                "created_by": "Started by",
+                "created_by_email": "Email",
+                "last_activity": "Last activity",
+                "dossier_exports": "Dossier exports",
+            },
+        )
+        st.download_button(
+            "Download overview (CSV)",
+            data=table[["id"] + display_columns].to_csv(index=False).encode("utf-8"),
+            file_name="workspace_overview.csv",
+            mime="text/csv",
+        )
+    st.markdown("### Members")
+    members = store.list_members(organization_id, current_user["id"])
+    st.dataframe(members[["display_name", "email", "role", "is_active", "last_login_at"]], use_container_width=True, hide_index=True)
+    with st.expander("Running a course section in this workspace"):
+        st.markdown(
+            "1. Create one workspace per section (the name is the course code and term).\n"
+            "2. On the **Team** page, paste the roster into *Invite a class or a team at once*; students join "
+            "through their links and get the *scientist* role, which lets them create projects and record results "
+            "but not sign approvals.\n"
+            "3. Each student or team starts a project: the built-in demo dataset for a guided lab, or their own "
+            "CSV for a semester project. **New project → Start with demo** is the two-minute path.\n"
+            "4. Follow the section here. Progress is the qualification score the students see on their own "
+            "Qualification page, so the number they are chasing is the number you grade.\n"
+            "5. At the end of term, students export their dossier or `.eln` archive; that file is the deliverable, "
+            "and its evidence hash proves it was not edited afterwards."
+        )
+    st.stop()
+
 elif page == "Pilot operations":
     st.header("Pilot operations")
     st.markdown("### Encrypted qualification artifacts")
@@ -679,22 +852,29 @@ elif page == "Pilot operations":
             payload, record = vault.retrieve_project_artifact(store, selected_artifact, current_user["id"])
             st.download_button("Download verified decrypted artifact", payload, file_name=record["filename"], mime=record["content_type"], use_container_width=True)
 
-    st.markdown("### Verified encrypted backups")
-    if st.button("Create verified backup now"):
-        backup_id, _ = create_backup(store, vault, organization_id=organization_id, created_by_user_id=current_user["id"])
-        st.success(f"Backup created and verified: {backup_id}")
-    backups = store.list_backups(organization_id=organization_id)
-    if not backups.empty:
-        st.dataframe(backups[["id", "filename", "status", "size_bytes", "created_at", "verified_at"]], use_container_width=True, hide_index=True)
+    if store.backend == "postgres":
+        st.markdown("### Backups")
+        st.info(
+            "This deployment runs on PostgreSQL. Backups and point-in-time recovery are handled by the "
+            "database provider; encrypted artifacts are stored in the database alongside their records."
+        )
+    else:
+        st.markdown("### Verified encrypted backups")
+        if st.button("Create verified backup now"):
+            backup_id, _ = create_backup(store, vault, organization_id=organization_id, created_by_user_id=current_user["id"])
+            st.success(f"Backup created and verified: {backup_id}")
+        backups = store.list_backups(organization_id=organization_id)
+        if not backups.empty:
+            st.dataframe(backups[["id", "filename", "status", "size_bytes", "created_at", "verified_at"]], use_container_width=True, hide_index=True)
 
-    st.markdown("### PostgreSQL migration bundle")
-    st.caption("The included application still runs on SQLite. This bundle supports a controlled migration into an already-provisioned PostgreSQL schema.")
-    if st.button("Build migration bundle"):
-        migration_bytes, manifest = create_postgres_migration_bundle(store.database_path)
-        st.session_state["postgres_bundle"] = migration_bytes
-        st.success(f"Exported {sum(manifest['table_counts'].values())} records across {len(manifest['table_counts'])} tables.")
-    if st.session_state.get("postgres_bundle"):
-        st.download_button("Download PostgreSQL migration bundle", st.session_state["postgres_bundle"], file_name="reformulation_postgres_migration.zip", mime="application/zip", use_container_width=True)
+        st.markdown("### PostgreSQL migration bundle")
+        st.caption("Export this local SQLite database as a checksummed bundle for loading into a PostgreSQL deployment (set REFORMULATION_DATABASE_URL to run on PostgreSQL directly).")
+        if st.button("Build migration bundle"):
+            migration_bytes, manifest = create_postgres_migration_bundle(store.database_path)
+            st.session_state["postgres_bundle"] = migration_bytes
+            st.success(f"Exported {sum(manifest['table_counts'].values())} records across {len(manifest['table_counts'])} tables.")
+        if st.session_state.get("postgres_bundle"):
+            st.download_button("Download PostgreSQL migration bundle", st.session_state["postgres_bundle"], file_name="reformulation_postgres_migration.zip", mime="application/zip", use_container_width=True)
 
 elif page == "Project overview":
     st.header(project["name"])

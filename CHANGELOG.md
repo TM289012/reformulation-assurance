@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.12.0 (2026-09-27)
+
+The hosted release: the same app can now serve several workspaces from one PostgreSQL database, so a lab, a brand or a course can use it without installing anything, while the local SQLite install stays the default and is unchanged. Nothing about the science moved; this release is plumbing plus the two features a course section needs, and it is documented in `DEPLOY.md` and the new for-courses page.
+
+- **PostgreSQL backend.** `db_backend.py` sits under the stores and speaks either SQLite (a file path, the default) or PostgreSQL (a `postgresql://` URL via psycopg 3): placeholder and DDL translation, portable upserts, dict/index row access, and one shared server connection per process that is reused across requests, serialized with a lock, and reopened when a serverless database has suspended it. `REFORMULATION_DATABASE_URL` selects it.
+- **Self-serve workspaces.** With `REFORMULATION_OPEN_SIGNUP=true` the sign-in screen gains a *Create a workspace* tab. A new email gets its own workspace as owner; an existing account can add a workspace by giving its password; a wrong password gets a clear refusal instead of a database error.
+- **Encrypted exports without a disk.** On PostgreSQL the encrypted dossier artifacts are stored as ciphertext rows instead of files, and the app reads the Fernet key from `REFORMULATION_ARTIFACT_KEY` (owners see a red banner while it is missing on a hosted deployment, because a key generated on a disposable disk is a data-loss bug waiting to happen).
+- **Sign-in throttling.** Eight failed attempts lock an email for fifteen minutes; a successful sign-in clears the counter. Local installs get this too.
+- **Roster invitations.** The Team page takes a pasted list of addresses and creates one invitation link each (two-week validity by default), with the links as a table and a CSV for a course announcement; malformed addresses are reported, not fatal.
+- **Workspace overview.** A new admin page lists every project in the workspace with who started it, imported lots, planned and completed experiments, batches, gates passed, the qualification progress score, live approvals, dossier exports and last activity, with a CSV export. Built for instructors and team leads. `docs/for-courses.html` describes the two-hour guided lab, section setup and a rubric.
+- **`.eln` export aligned with the ELN file format's September 2026 wording** (1.2+202609): `keywords` is a comma-separated string, every attached file is listed in the root `hasPart` import list alongside the experiment entry, the metadata descriptor carries its `version`, and empty evidence tables are no longer attached as zero-byte files (they stay in `SHA256SUMS.txt`, and the crate description names them). The crate stays on RO-Crate 1.1 until the consortium's validator supports 1.2. Checked against the consortium's own test suite (archive structure, ro-crate-py parse, metadata rules, JSON schema: all pass) and eLabFTW's current importer source.
+- Settings can come from Streamlit secrets as well as the environment (`REFORMULATION_DATABASE_URL`, `REFORMULATION_OPEN_SIGNUP`, `REFORMULATION_PUBLIC_URL`, `REFORMULATION_ARTIFACT_KEY`, `REFORMULATION_DEMO_MODE`).
+- The SQLite-only operations (verified backup files, the PostgreSQL migration bundle) hide themselves on PostgreSQL, where the database provider's backups apply.
+- Testing: the full suite runs unchanged against PostgreSQL with `REFORMULATION_FORCE_DATABASE_URL` (each test store in its own schema); `tests/test_app_smoke.py` drives the real `app.py` headlessly through Streamlit's `AppTest` (first-owner bootstrap, sign-in, open sign-up, mismatched passwords). Suite grows to 74.
+
 ## v0.11.0 (2026-09-05)
 
 The notebook release: the qualification dossier now exports as a `.eln` archive, the ELN Consortium's open format (a zipped RO-Crate), so a project's evidence can be filed in the electronic lab notebook a lab already keeps. Prompted by the eLabFTW community discussion on the best import path, where maintainer Nicolas CARPi recommended `.eln` while noting that a full JSON export is worth keeping. Both are here.

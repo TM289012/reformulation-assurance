@@ -2,6 +2,10 @@
 
 The project's goal at this stage is domain signal and honest evidence, not sales: get the workflow in front of real formulators and statisticians, collect criticism, and let the calibration pages prove or disprove the models in public.
 
+## Shipped: v0.12.0 — Hosted workspaces (September 2026)
+
+The same app now runs on PostgreSQL with self-serve workspaces, so a lab, a brand or a course can use it without installing anything, at zero hosting cost on Streamlit Community Cloud plus a free Neon database. Local SQLite stays the default and the recommendation for confidential formulations. Encrypted exports live in the database on the hosted path, sign-ins are throttled, and the whole test suite runs against both backends. See CHANGELOG.md and DEPLOY.md.
+
 ## Shipped: v0.11.0 — Notebook export (September 2026)
 
 The qualification dossier exports as a `.eln` archive (ELN Consortium format, a zipped RO-Crate) that imports into eLabFTW, RSpace and other notebooks as one experiment entry with every evidence file attached and hashed in the metadata. The path was chosen in the open: the eLabFTW maintainer recommended `.eln` over a CSV or API integration, and asked that the JSON export stay, so it did. Distribution through the notebooks labs already keep, not through a connector this project would have to sell. See CHANGELOG.md.
@@ -22,7 +26,7 @@ Sign-offs now store the full frozen evidence snapshot (canonical JSON) alongside
 
 The app is clickable in a browser with nothing to install (public demo sandbox), two standalone single-question tools serve the questions formulators hit mid-experiment (baseline drift, replicate noise), and the recommendation layer was benchmarked head-to-head against BayBE 0.15 with the protocol, biases, and results public. See CHANGELOG.md and the v0.7.0 release.
 
-## Next: v0.12 — Chemistry-aware suggestions (in design on branch `v08-slot-based`, named before renumbering)
+## Next: v0.13 — Chemistry-aware suggestions (in design on branch `v08-slot-based`, named before renumbering)
 
 - **Slot-based ingredient representation.** Instead of one column per candidate emulsifier, model the substitution question the way it is actually asked: one emulsifier slot choosing WHICH substance (BayBE `SubstanceParameter`, encoded from real molecular structures) and HOW MUCH, hybrid with traditional columns for everything else. Day-one spike is complete and on the branch (`v08_slot_spike.py`): five real molecules with PubChem-sourced SMILES (the polymeric legacy PEG as a disclosed representative oligomer), MORDRED descriptors, stateless recommender end to end.
 - **Optional BayBE ranking mode in the app.** The benchmark showed BayBE's recommender with a proper multi-target objective performs on par with the built-in ranking; offering it as an optional mode (own candidate pool via `SearchSpace.from_dataframe`, stateless `recommend`) is now justified. Behind an optional extras install (`baybe` pulls PyTorch); the core app stays light.
@@ -34,7 +38,7 @@ The app is clickable in a browser with nothing to install (public demo sandbox),
 
 - Stability-study scheduling and timepoint tracking
 - Supplier-lot study designer improvements and process-window result visualization
-- PostgreSQL as the active runtime, managed backups, email delivery
+- Managed backups and email delivery for hosted workspaces (PostgreSQL shipped in v0.12)
 - Dataset/version rollback and admin-visible diagnostics
 
 ## Explicitly parked (enterprise-era items)

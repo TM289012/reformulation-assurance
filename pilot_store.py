@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
+import re
 import uuid
 
 import pandas as pd
@@ -163,6 +164,11 @@ class PilotStore(ProductStore):
             approval_columns = self._column_names(con, "approvals")
             if "policy_id" not in approval_columns:
                 con.execute("ALTER TABLE approvals ADD COLUMN policy_id TEXT")
+            # v0.12: hosted deployments keep encrypted artifacts in the database
+            # (the app server has no durable disk); local deployments keep files.
+            if "ciphertext" not in self._column_names(con, "encrypted_artifacts"):
+                blob_type = "BYTEA" if con.backend == "postgres" else "BLOB"
+                con.execute(f"ALTER TABLE encrypted_artifacts ADD COLUMN ciphertext {blob_type}")
 
     # ------------------------------------------------------------------
     # Outbox, invitations, and recovery
@@ -330,6 +336,84 @@ class PilotStore(ProductStore):
                 (_now(), user_id, row["id"]),
             )
         return user_id, str(row["organization_id"])
+
+    @staticmethod
+    def parse_email_list(text: str) -> list[str]:
+        """Split a pasted roster (one per line, or comma/semicolon/space separated) into unique emails."""
+        seen: list[str] = []
+        for candidate in re.split(r"[\s,;]+", str(text or "")):
+            candidate = candidate.strip().strip("<>").lower()
+            if candidate and candidate not in seen:
+                seen.append(candidate)
+        return seen
+
+    def create_invitations(
+        self,
+        organization_id: str,
+        *,
+        emails: Iterable[str],
+        role: str,
+        actor_user_id: str,
+        base_url: str = "http://localhost:8501",
+        expires_hours: int = 72,
+    ) -> pd.DataFrame:
+        """Invite a whole roster at once (a course section, a team).
+
+        One row per address: ``status`` is ``invited`` with the link to pass on, or
+        ``skipped`` with the reason (a malformed address, for example). Permission
+        and role checks are the same as for a single invitation.
+        """
+        self.require_role(actor_user_id, organization_id, ADMIN_ROLES)
+        if role not in ROLES:
+            raise ValueError(f"unsupported role: {role}")
+        results: list[dict[str, Any]] = []
+        for email in emails:
+            email = str(email).strip()
+            if not email:
+                continue
+            try:
+                invitation = self.create_invitation(
+                    organization_id, email=email, role=role, actor_user_id=actor_user_id,
+                    base_url=base_url, expires_hours=expires_hours,
+                )
+                results.append({
+                    "email": email.lower(), "role": role, "status": "invited",
+                    "invite_url": invitation["invite_url"], "expires_at": invitation["expires_at"],
+                })
+            except ValueError as exc:
+                results.append({"email": email, "role": role, "status": f"skipped: {exc}", "invite_url": "", "expires_at": ""})
+        return pd.DataFrame(results, columns=["email", "role", "status", "invite_url", "expires_at"])
+
+    def workspace_overview(self, organization_id: str, actor_user_id: str) -> pd.DataFrame:
+        """Every project in the workspace with its activity counts, for instructors and admins.
+
+        One row per project: who created it, how much history was imported, how many
+        recommended experiments exist and were completed, batches, live approvals,
+        dossier exports and the time of the last recorded action.
+        """
+        self.require_role(actor_user_id, organization_id, ADMIN_ROLES)
+        with self.connection() as con:
+            rows = con.execute(
+                """SELECT p.id, p.name, p.created_at, p.updated_at, p.created_by_user_id,
+                       u.display_name AS created_by, u.email AS created_by_email,
+                       (SELECT COUNT(*) FROM experiments e WHERE e.project_id = p.id AND e.source_type = 'historical') AS historical_rows,
+                       (SELECT COUNT(*) FROM experiments e WHERE e.project_id = p.id AND e.source_type = 'recommended') AS recommended_experiments,
+                       (SELECT COUNT(*) FROM experiments e WHERE e.project_id = p.id AND e.source_type = 'recommended' AND e.status = 'completed') AS completed_experiments,
+                       (SELECT COUNT(*) FROM batches b WHERE b.project_id = p.id) AS batches,
+                       (SELECT COUNT(*) FROM approvals a WHERE a.project_id = p.id AND a.withdrawn_at IS NULL) AS approvals,
+                       (SELECT COUNT(*) FROM dossiers d WHERE d.project_id = p.id) AS dossier_exports,
+                       (SELECT MAX(ae.created_at) FROM audit_events ae WHERE ae.project_id = p.id) AS last_activity
+                FROM projects p LEFT JOIN users u ON u.id = p.created_by_user_id
+                WHERE p.organization_id = ?
+                ORDER BY p.created_at""",
+                (organization_id,),
+            ).fetchall()
+        columns = [
+            "id", "name", "created_at", "updated_at", "created_by_user_id", "created_by", "created_by_email",
+            "historical_rows", "recommended_experiments", "completed_experiments", "batches", "approvals",
+            "dossier_exports", "last_activity",
+        ]
+        return pd.DataFrame([dict(row) for row in rows], columns=columns)
 
     def list_invitations(self, organization_id: str, actor_user_id: str) -> pd.DataFrame:
         self.require_role(actor_user_id, organization_id, ADMIN_ROLES)
@@ -682,7 +766,8 @@ class PilotStore(ProductStore):
     def save_artifact_record(self, project_id: str, *, created_by_user_id: str, artifact_type: str,
                              filename: str, content_type: str, storage_path: str,
                              plaintext_sha256: str, ciphertext_sha256: str, size_bytes: int,
-                             encryption_method: str, metadata: Mapping[str, Any] | None = None) -> str:
+                             encryption_method: str, metadata: Mapping[str, Any] | None = None,
+                             ciphertext: bytes | None = None) -> str:
         self.require_project_access(created_by_user_id, project_id)
         artifact_id = str(uuid.uuid4())
         with self.connection() as con:
@@ -690,11 +775,11 @@ class PilotStore(ProductStore):
                 """INSERT INTO encrypted_artifacts
                 (id, project_id, created_by_user_id, artifact_type, filename, content_type,
                  storage_path, plaintext_sha256, ciphertext_sha256, size_bytes,
-                 encryption_method, metadata_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                 encryption_method, metadata_json, created_at, ciphertext)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (artifact_id, project_id, created_by_user_id, artifact_type, filename, content_type,
                  storage_path, plaintext_sha256, ciphertext_sha256, int(size_bytes), encryption_method,
-                 dumps(metadata or {}), _now()),
+                 dumps(metadata or {}), _now(), ciphertext),
             )
         self.audit(project_id, "encrypted_artifact_saved", entity_type="artifact", entity_id=artifact_id,
                    detail={"artifact_type": artifact_type, "filename": filename, "plaintext_sha256": plaintext_sha256})
@@ -704,7 +789,10 @@ class PilotStore(ProductStore):
         self.require_project_access(actor_user_id, project_id)
         with self.connection() as con:
             rows = con.execute(
-                """SELECT a.*, u.display_name AS created_by
+                """SELECT a.id, a.project_id, a.created_by_user_id, a.artifact_type, a.filename,
+                       a.content_type, a.storage_path, a.plaintext_sha256, a.ciphertext_sha256,
+                       a.size_bytes, a.encryption_method, a.metadata_json, a.created_at,
+                       u.display_name AS created_by
                 FROM encrypted_artifacts a JOIN users u ON u.id = a.created_by_user_id
                 WHERE a.project_id = ? ORDER BY a.created_at DESC""",
                 (project_id,),

@@ -5,10 +5,9 @@ project isolation, approval signatures, and generated dossier records.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
-import sqlite3
 import uuid
 
 import pandas as pd
@@ -20,6 +19,16 @@ ROLES = ("owner", "admin", "scientist", "approver", "viewer")
 EDIT_ROLES = {"owner", "admin", "scientist"}
 APPROVAL_ROLES = {"owner", "admin", "approver"}
 ADMIN_ROLES = {"owner", "admin"}
+
+# Sign-in throttling: after this many failed attempts for one email inside the window,
+# further attempts are refused until the window has passed. Protects hosted
+# workspaces from online password guessing without needing the client's address.
+MAX_FAILED_SIGN_INS = 8
+SIGN_IN_LOCKOUT_MINUTES = 15
+
+
+class TooManyAttempts(ValueError):
+    """Raised by ``authenticate`` while an email is locked out."""
 
 
 class ProductStore(ProjectStore):
@@ -82,6 +91,11 @@ class ProductStore(ProjectStore):
                 CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id);
                 CREATE INDEX IF NOT EXISTS idx_approvals_project ON approvals(project_id, signed_at);
                 CREATE INDEX IF NOT EXISTS idx_dossiers_project ON dossiers(project_id, version);
+                CREATE TABLE IF NOT EXISTS login_failures (
+                    email TEXT NOT NULL,
+                    failed_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_login_failures_email ON login_failures(email, failed_at);
                 """
             )
             project_columns = self._column_names(con, "projects")
@@ -115,17 +129,31 @@ class ProductStore(ProjectStore):
         user_id = str(uuid.uuid4())
         organization_id = str(uuid.uuid4())
         now = _now()
-        password_hash = hash_password(password)
         with self.connection() as con:
+            existing = con.execute(
+                "SELECT id, password_hash, is_active FROM users WHERE email = ?", (email,)
+            ).fetchone()
+            if existing is not None:
+                # Self-serve sign-up with an email that already has an account: the
+                # password must match, and the new workspace is added to that account
+                # instead of failing on the unique email constraint.
+                if not existing["is_active"] or not verify_password(password, existing["password_hash"]):
+                    raise ValueError(
+                        "An account with this email already exists. Sign in, or enter that "
+                        "account's password to add a new workspace to it."
+                    )
+                user_id = str(existing["id"])
+            else:
+                password_hash = hash_password(password)
+                con.execute(
+                    """INSERT INTO users
+                    (id, email, display_name, password_hash, is_active, created_at)
+                    VALUES (?, ?, ?, ?, 1, ?)""",
+                    (user_id, email, display_name, password_hash, now),
+                )
             con.execute(
                 "INSERT INTO organizations (id, name, created_at) VALUES (?, ?, ?)",
                 (organization_id, organization_name, now),
-            )
-            con.execute(
-                """INSERT INTO users
-                (id, email, display_name, password_hash, is_active, created_at)
-                VALUES (?, ?, ?, ?, 1, ?)""",
-                (user_id, email, display_name, password_hash, now),
             )
             con.execute(
                 """INSERT INTO memberships
@@ -172,18 +200,43 @@ class ProductStore(ProjectStore):
             )
         return user_id
 
+    def failed_sign_ins(self, email: str) -> int:
+        """Failed attempts recorded for this email inside the lockout window."""
+        try:
+            email = validate_email(email)
+        except ValueError:
+            return 0
+        since = (datetime.now(timezone.utc) - timedelta(minutes=SIGN_IN_LOCKOUT_MINUTES)).isoformat(timespec="seconds")
+        with self.connection() as con:
+            return int(con.execute(
+                "SELECT COUNT(*) FROM login_failures WHERE email = ? AND failed_at >= ?", (email, since)
+            ).fetchone()[0])
+
     def authenticate(self, email: str, password: str) -> dict[str, Any] | None:
+        """Return the user for a correct email/password, ``None`` for a wrong one.
+
+        Raises ``TooManyAttempts`` once an email has accumulated
+        ``MAX_FAILED_SIGN_INS`` failures inside ``SIGN_IN_LOCKOUT_MINUTES``; the
+        counter clears on a successful sign-in.
+        """
         try:
             email = validate_email(email)
         except ValueError:
             return None
+        if self.failed_sign_ins(email) >= MAX_FAILED_SIGN_INS:
+            raise TooManyAttempts(
+                f"Too many failed sign-in attempts for this email. Try again in "
+                f"{SIGN_IN_LOCKOUT_MINUTES} minutes, or reset the password."
+            )
         with self.connection() as con:
             row = con.execute(
                 "SELECT * FROM users WHERE email = ? AND is_active = 1", (email,)
             ).fetchone()
             if row is None or not verify_password(password, row["password_hash"]):
+                con.execute("INSERT INTO login_failures (email, failed_at) VALUES (?, ?)", (email, _now()))
                 return None
             con.execute("UPDATE users SET last_login_at = ? WHERE id = ?", (_now(), row["id"]))
+            con.execute("DELETE FROM login_failures WHERE email = ?", (email,))
         result = dict(row)
         result.pop("password_hash", None)
         result["is_active"] = bool(result["is_active"])

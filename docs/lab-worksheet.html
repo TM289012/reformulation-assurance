@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lab worksheet: qualifying a replacement ingredient — Reformulation Assurance</title>
+<meta name="description" content="Student worksheet for a two-hour lab: read a batch history, design a batch, enter results, judge replicates, sign and export tamper-evident evidence. Printable.">
+<link rel="canonical" href="https://tm289012.github.io/reformulation-assurance/lab-worksheet.html">
+<style>
+  :root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --accent: #0f766e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px 16px 64px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); line-height: 1.5; background: #f9fafb; }
+  main { max-width: 760px; margin: 0 auto; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 28px 32px; }
+  .eyebrow { display: inline-block; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; }
+  h2 { font-size: 1.1rem; margin: 26px 0 8px; color: var(--accent); border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  p, li, td, th { font-size: 0.95rem; }
+  .meta { display: flex; gap: 24px; flex-wrap: wrap; color: var(--muted); font-size: 0.9rem; margin: 10px 0 0; }
+  .meta span { border-bottom: 1px solid var(--ink); min-width: 160px; display: inline-block; }
+  ol { padding-left: 22px; } li { margin-bottom: 8px; }
+  .box { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0 14px; min-height: 64px; background: #fafafa; }
+  .box.short { min-height: 40px; }
+  .check::before { content: "\2610"; margin-right: 8px; color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f0fdfa; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+  .note { color: var(--muted); font-size: 0.9rem; }
+  a { color: var(--accent); }
+  footer { margin-top: 28px; font-size: 0.85rem; color: var(--muted); }
+  @media print {
+    body { padding: 0; background: #fff; }
+    main { border: none; border-radius: 0; padding: 0; max-width: none; }
+    a { color: inherit; text-decoration: none; }
+    h2 { break-after: avoid; }
+    .box { break-inside: avoid; }
+    footer { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <span class="eyebrow">Reformulation Assurance · lab worksheet</span>
+  <h1>Qualifying a replacement ingredient</h1>
+  <p class="note">Two hours. Works in a browser with the demo dataset; no bench work needed. Your instructor will tell you where to sign in. Print this page or keep it open beside the app.</p>
+  <p class="meta"><label>Name <span></span></label> <label>Team <span></span></label> <label>Date <span></span></label></p>
+
+  <h2>The situation</h2>
+  <p>A supplier has discontinued the plasticizer in a coating. Two candidate substitutes exist. The replacement has to meet the original specifications: adhesion at least 8.0, viscosity between 2000 and 2600 cP, dry time at most 40 minutes, gloss at least 85. You have 72 historical lots; 61 completed and 11 failed before they could be measured. Your job is to get from that history to a candidate you would be willing to sign your name under.</p>
+
+  <h2>Part 1 · Read the history (15 min)</h2>
+  <ol>
+    <li class="check">Sign in, then <strong>New project → Start with demo → Create v0.6 demo project</strong>.</li>
+    <li class="check">Open the same history as a spreadsheet: <a href="https://github.com/TM289012/reformulation-assurance/blob/main/demo_coatings_reformulation.csv">demo_coatings_reformulation.csv</a> (Download raw file, then open in Excel or Sheets). Sort by <code>status</code>.</li>
+    <li class="check">On <strong>Project overview</strong>, read the six numbers at the top and the qualification gates table. Nothing is qualified yet; that is the starting line.</li>
+  </ol>
+  <p>Q1. The eleven failed lots carry a <code>failure_reason</code> but no measurements. List the three reasons. Then look at <code>mix_temperature_c</code> and <code>supplier_family</code> for the failed lots: what pattern do you see, and what would you tell the lab to avoid in the next batch?</p>
+  <div class="box"></div>
+
+  <h2>Part 2 · Design a batch (20 min)</h2>
+  <ol>
+    <li class="check"><strong>Recommendations → Generate next batch.</strong> Model fitting takes 30 to 60 seconds.</li>
+    <li class="check">Read the caption under the table before you read the numbers.</li>
+  </ol>
+  <table>
+    <tr><th>Candidate</th><th>Purpose (from the table)</th><th>Probability of meeting all specs</th><th>Why the model chose it (your words)</th></tr>
+    <tr><td>1</td><td></td><td></td><td></td></tr>
+    <tr><td>2</td><td></td><td></td><td></td></tr>
+    <tr><td>3</td><td></td><td></td><td></td></tr>
+    <tr><td>4</td><td></td><td></td><td></td></tr>
+    <tr><td>5</td><td></td><td></td><td></td></tr>
+  </table>
+  <p>Q2. The caption says what the probability is and is not. In one sentence: what would it be a mistake to conclude from a candidate showing 0.62?</p>
+  <div class="box short"></div>
+  <ol start="3">
+    <li class="check"><strong>Approve and freeze batch.</strong> Note: nothing about this batch can change now. Why might that matter to an auditor?</li>
+  </ol>
+  <div class="box short"></div>
+
+  <h2>Part 3 · Run it on paper (25 min)</h2>
+  <p>Pretend the lab ran the batch. On <strong>Experiment loop</strong>, pick each experiment, set <em>Status</em> to <code>completed</code>, enter plausible numbers for all four responses, and <strong>Save experiment update</strong>. Make at least one candidate fail one specification on purpose, and say which in the notes.</p>
+  <table>
+    <tr><th>Experiment</th><th>adhesion</th><th>viscosity_cp</th><th>dry_time_min</th><th>gloss</th><th>Passes all specs?</th></tr>
+    <tr><td>B01-E01</td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>B01-E02</td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>B01-E03</td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>B01-E04</td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td>B01-E05</td><td></td><td></td><td></td><td></td><td></td></tr>
+  </table>
+  <ol>
+    <li class="check">After the last result, open <strong>Calibration</strong>. The models retrained on your results.</li>
+  </ol>
+  <p>Q3. Look at the run-level calibration. Were the model's predictions for your entered results too optimistic, too pessimistic, or about right? What would you want to see before trusting the next batch's probabilities?</p>
+  <div class="box"></div>
+
+  <h2>Part 4 · Judge the replicates (25 min)</h2>
+  <ol>
+    <li class="check">On <strong>Experiment loop</strong>, choose your best candidate. Open <strong>Create missing linked replicates</strong>, set the target to <code>3</code>, and create them.</li>
+    <li class="check">Enter results for all three, and for each one set <em>Qualification stage</em> to <code>confirmation</code> before saving (the confirmation gate only counts replicate groups at its own stage). Keep two of them close together and make the third one clearly off on one response (for example viscosity 2250, 2280, then 3400).</li>
+    <li class="check">Go to <strong>Qualification</strong> and open <strong>Running records — look before computing</strong>. Then read the confirmation gate's remaining requirements.</li>
+  </ol>
+  <p>Q4. What did the gate say about your odd replicate, and in what order does it judge things (running record, limits from the other replicates, CV)? Why would a CV computed across all three have hidden the problem or exaggerated it?</p>
+  <div class="box"></div>
+  <ol start="4">
+    <li class="check">Fix the odd replicate to a consistent value and watch the gate's status change.</li>
+  </ol>
+
+  <h2>Part 5 · Sign and export (20 min)</h2>
+  <ol>
+    <li class="check"><strong>Approvals &amp; dossier.</strong> Note the evidence hash shown for the project.</li>
+    <li class="check">Sign the <code>discovery</code> stage: choose the signature meaning, type your account name, re-enter your password, <strong>Sign approval</strong>.</li>
+    <li class="check"><strong>Generate dossier package</strong> and open the ZIP. Find <code>SHA256SUMS.txt</code> and the approvals table.</li>
+    <li class="check">Go back to <strong>Experiment loop</strong> and change one result. Return to <strong>Approvals &amp; dossier</strong>.</li>
+  </ol>
+  <p>Q5. What happened to the evidence hash and to your signature's <code>matches_current_evidence</code> flag after you changed a result? Why is a visible warning that the newest evidence has not been signed more useful to an auditor than a signature that silently still looks valid?</p>
+  <div class="box"></div>
+
+  <h2>Hand in</h2>
+  <ul>
+    <li class="check">This worksheet (Q1 to Q5 answered).</li>
+    <li class="check">Your dossier ZIP or <code>.eln</code> archive. Your instructor will check that the evidence hash inside matches the signed approval.</li>
+    <li class="check">One paragraph: which candidate would you take to the confirmation stage, and what would you still need before recommending it to production?</li>
+  </ul>
+
+  <p class="note">Everything in the demo is synthetic data built for teaching. The tool is decision support; it does not replace chemical-safety review, regulatory review or a validated quality system.</p>
+
+  <footer>
+    Reformulation Assurance · free and open-source (MIT) · <a href="for-courses.html">For courses</a> · <a href="https://github.com/TM289012/reformulation-assurance">Source on GitHub</a>
+  </footer>
+</main>
+</body>
+</html>

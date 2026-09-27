@@ -78,9 +78,18 @@ class ElnExportTests(unittest.TestCase):
         self.assertEqual(publisher["@type"], "Organization")
         root = nodes["./"]
         self.assertEqual(root["@type"], "Dataset")
-        self.assertEqual(root["hasPart"], [{"@id": manifest["experiment_id"]}])
+        # Root hasPart is the import list (ELN format 1.2+202609): the experiment entry
+        # first, then every attached file; importers that make one record per root
+        # Dataset skip the File entries.
+        experiment = nodes[manifest["experiment_id"]]
+        self.assertEqual(root["hasPart"][0], {"@id": manifest["experiment_id"]})
+        self.assertEqual(root["hasPart"][1:], experiment["hasPart"])
+        for part in root["hasPart"][1:]:
+            self.assertEqual(nodes[part["@id"]]["@type"], "File")
         # eLabFTW reads a "version" on the root dataset as ITS OWN internal format marker; never set one.
         self.assertNotIn("version", root)
+        # The descriptor's version is a different thing: the format's descriptor version.
+        self.assertEqual(descriptor["version"], "1.0")
 
     def test_experiment_entry_carries_what_an_eln_importer_reads(self):
         _, manifest, _, metadata = self._export()
@@ -94,7 +103,9 @@ class ElnExportTests(unittest.TestCase):
         self.assertIn(self.evidence_hash, experiment["text"])
         self.assertIn("<h1>", experiment["text"])
         self.assertNotIn("<html", experiment["text"])  # a body fragment, not a document
-        self.assertIsInstance(experiment["keywords"], list)
+        # Comma-separated string per the ELN format; eLabFTW splits it into tags.
+        self.assertIsInstance(experiment["keywords"], str)
+        self.assertIn("qualification dossier", [k.strip() for k in experiment["keywords"].split(",")])
         author = nodes[experiment["author"]["@id"]]
         self.assertEqual(author["@type"], "Person")
         self.assertTrue(author["givenName"] or author["familyName"] or author["name"])
@@ -148,6 +159,23 @@ class ElnExportTests(unittest.TestCase):
         )
         self.assertEqual(canonical_node["sha256"], manifest["scientific_evidence_sha256"])
         self.assertEqual(canonical_node["sha256"], self.evidence_hash)
+
+    def test_empty_evidence_tables_are_not_attached_but_are_declared(self):
+        _, manifest, archive, metadata = self._export()
+        root = manifest["root_folder"]
+        members = archive.namelist()
+        # The demo project has no comments or robustness runs yet: those tables are empty.
+        self.assertIn("comments.csv", manifest["omitted_empty_files"])
+        checksums = archive.read(f"{root}/dossier-v1/SHA256SUMS.txt").decode("utf-8")
+        for name in manifest["omitted_empty_files"]:
+            self.assertNotIn(f"{root}/dossier-v1/{name}", members)
+            self.assertIn(name, checksums)
+        for info in archive.infolist():
+            if info.filename.endswith(".csv"):
+                self.assertGreater(info.file_size, 0, info.filename)
+        nodes = {node["@id"]: node for node in metadata["@graph"]}
+        self.assertIn("not attached", nodes["./"]["description"])
+        self.assertEqual(manifest["file_count"], len(manifest["files"]))
 
     def test_workbook_can_be_left_out(self):
         _, manifest, _, metadata = self._export(include_workbook=False)

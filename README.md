@@ -8,7 +8,7 @@ When an ingredient gets discontinued or restricted, proving the replacement work
 
 Reformulation Assurance is an open-source, local-first workbench for ingredient-replacement projects in formulated products: coatings, adhesives, sealants — anything mixed to a specification. It takes a team from "our supplier discontinued this plasticizer" to a qualified replacement, with every experiment, model prediction, approval, and decision recorded along the way.
 
-It runs entirely on your machine. Your formulations live in a SQLite file you own. Nothing is uploaded anywhere, there is no telemetry, and there is no cloud account — which matters, because formulations are usually the most confidential thing a company has.
+It runs entirely on your machine. Your formulations live in a SQLite file you own. Nothing is uploaded anywhere, there is no telemetry, and there is no cloud account — which matters, because formulations are usually the most confidential thing a company has. (Teams and courses that would rather not install anything can run one shared instance on PostgreSQL with self-serve workspaces; see [DEPLOY.md](DEPLOY.md).)
 
 **It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep — CSV evidence tables, a printable dossier, the signed evidence snapshots, an Excel workbook, or a single `.eln` archive that imports into eLabFTW, RSpace and other lab notebooks as one entry. Local files in, local files out, no lock-in.
 
@@ -57,11 +57,13 @@ Then take the built-in tour — no data needed:
 3. **Approve and freeze batch**, then go to **Experiment loop**, mark an experiment completed, and enter plausible numbers (e.g. adhesion 8.5, viscosity 2300, dry time 35, gloss 90). Watch the models retrain.
 4. Open **Approvals & dossier**: the evidence hash has changed because the evidence did. Sign the discovery stage (it re-authenticates you and binds the signature to that exact hash), then export the dossier and look inside the zip.
 
-To run the test suite (52 tests):
+To run the test suite (74 tests):
 
 ```bash
 python -m unittest discover -s tests
 ```
+
+The suite also runs unchanged against PostgreSQL (`REFORMULATION_FORCE_DATABASE_URL`, see [DEPLOY.md](DEPLOY.md)).
 
 ## Using your own data
 
@@ -84,6 +86,10 @@ Two standalone one-page tools answer questions formulators hit mid-experiment. E
 - **[Baseline Drift Checker](https://tm289012.github.io/reformulation-assurance/drift-checker.html)** — paste time-ordered measurements of anything that should be stable (a control batch, a reference standard, an instrument baseline) and get an XmR-chart verdict: routine noise, or a shift/drift worth investigating.
 - **[Replicate Noise Checker](https://tm289012.github.io/reformulation-assurance/replicate-checker.html)** — paste a few replicates of formula A and formula B and learn whether the difference is real, suggestive, or inside your noise — plus the smallest difference your replicate count could even detect.
 
+## For courses
+
+A section can run the whole ingredient-replacement workflow as a lab without any wet chemistry: read the history, design a batch, enter results on paper, watch the confirmation gate catch an inconsistent replicate, sign the evidence and export a tamper-evident dossier. The **Team** page invites a pasted roster in one go, and the **Workspace overview** page (owners and admins) shows every project's progress, gates passed and last activity with a CSV export for the gradebook. Lab outline, setup steps and a rubric: [for-courses](https://tm289012.github.io/reformulation-assurance/for-courses.html).
+
 ## What the numbers mean (and don't)
 
 This project prefers honest labels over impressive ones. The short version:
@@ -101,8 +107,8 @@ The full disclosure, including known weaknesses, is in [MODELING_NOTES.md](MODEL
 This is a pilot-stage prototype, and the boundaries are stated rather than implied:
 
 - Not a validated quality system, and signatures are internal approval records — no FDA 21 CFR Part 11 or EU Annex 11 claims.
-- No SSO or MFA; authentication is local (PBKDF2, rate-unlimited) and suitable for a single trusted team, not the open internet.
-- SQLite single-instance by design. Do not put it on a public server.
+- No SSO or MFA; authentication is local (PBKDF2, throttled after repeated failures) and suitable for a trusted team or a course, not for trade-secret formulations on a shared server.
+- Local SQLite by default. The hosted mode ([DEPLOY.md](DEPLOY.md)) is for a small team or classroom that has decided a shared instance is acceptable for its data.
 - Decision support only: qualified professionals remain responsible for chemical safety, regulatory review, physical execution, and final product approval.
 - Stability studies and pilot/scale-up designers are planned but not built ([PRODUCT_ROADMAP.md](PRODUCT_ROADMAP.md)).
 
@@ -113,7 +119,8 @@ This is a pilot-stage prototype, and the boundaries are stated rather than impli
 - `closed_loop.py` — retraining loop and qualification gates
 - `assurance_v4.py` — robustness simulation and prospective calibration
 - `process_window.py` — bounded process-window study designs
-- `project_store.py` / `product_store.py` / `pilot_store.py` — layered SQLite store: scientific ledger → organizations and approvals → collaboration and operations
+- `project_store.py` / `product_store.py` / `pilot_store.py` — layered store: scientific ledger → organizations and approvals → collaboration and operations
+- `db_backend.py` — the SQLite/PostgreSQL adapter under the stores
 - `dossier.py` — evidence hashing and dossier export
 - `eln_export.py` — `.eln` (RO-Crate) notebook archive export and CLI
 - `security.py`, `artifact_vault.py`, `backup_service.py` — password hashing, encrypted artifacts, verified backups

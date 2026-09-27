@@ -8,7 +8,13 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import os
 import unittest
+
+SQLITE_ONLY = unittest.skipIf(
+    os.environ.get("REFORMULATION_FORCE_DATABASE_URL"),
+    "exercises the local SQLite file directly",
+)
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
@@ -74,6 +80,7 @@ class EvidenceSnapshotTests(unittest.TestCase):
         stored = row["evidence_snapshot"]
         self.assertFalse(isinstance(stored, str) and stored)
 
+    @SQLITE_ONLY
     def test_migration_adds_column_to_pre_v080_database(self):
         db_path = Path(self.tempdir.name) / "legacy.db"
         legacy = PilotStore(db_path)

@@ -66,27 +66,41 @@ class ArtifactVault:
         metadata: Mapping[str, Any] | None = None,
     ) -> str:
         encrypted = self.encrypt(payload)
-        artifact_dir = self.root / "projects" / project_id
-        artifact_dir.mkdir(parents=True, exist_ok=True)
-        storage_path = artifact_dir / f"{uuid.uuid4()}.fernet"
-        storage_path.write_bytes(encrypted)
+        in_database = getattr(store, "backend", "sqlite") == "postgres"
+        if in_database:
+            # Hosted deployment: the app server has no durable disk, so the
+            # ciphertext lives beside its record in the database.
+            storage_path = f"database://encrypted_artifacts/{uuid.uuid4()}"
+            stored_ciphertext: bytes | None = encrypted
+        else:
+            artifact_dir = self.root / "projects" / project_id
+            artifact_dir.mkdir(parents=True, exist_ok=True)
+            file_path = artifact_dir / f"{uuid.uuid4()}.fernet"
+            file_path.write_bytes(encrypted)
+            storage_path = str(file_path)
+            stored_ciphertext = None
         return store.save_artifact_record(
             project_id,
             created_by_user_id=created_by_user_id,
             artifact_type=artifact_type,
             filename=filename,
             content_type=content_type,
-            storage_path=str(storage_path),
+            storage_path=storage_path,
             plaintext_sha256=self.sha256(payload),
             ciphertext_sha256=self.sha256(encrypted),
             size_bytes=len(payload),
             encryption_method="fernet-aes128-cbc-hmac-sha256",
             metadata=metadata,
+            ciphertext=stored_ciphertext,
         )
 
     def retrieve_project_artifact(self, store: PilotStore, artifact_id: str, actor_user_id: str) -> tuple[bytes, dict[str, Any]]:
         record = store.get_artifact(artifact_id, actor_user_id)
-        encrypted = Path(record["storage_path"]).read_bytes()
+        stored = record.pop("ciphertext", None)
+        if stored is not None:
+            encrypted = bytes(stored)
+        else:
+            encrypted = Path(record["storage_path"]).read_bytes()
         if self.sha256(encrypted) != record["ciphertext_sha256"]:
             raise ValueError("encrypted artifact checksum does not match its metadata")
         payload = self.decrypt(encrypted)

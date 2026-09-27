@@ -16,7 +16,9 @@
 
 - `product_store.py`: users, organizations, roles, approvals, and dossiers
 - `pilot_store.py`: invitations, reset links, comments, assignments, multi-signer policies, artifact and backup metadata
-- `app.py`: Streamlit interface
+- `db_backend.py` (v0.12): the adapter every store opens its connection through; SQLite for a file path (default), PostgreSQL through psycopg 3 for a `postgresql://` URL, with placeholder/DDL translation and one shared, lock-serialized server connection per process
+- `eln_export.py` (v0.11): `.eln` (RO-Crate) notebook archive export
+- `app.py`: Streamlit interface; deployment settings are read from the environment, then Streamlit secrets (see DEPLOY.md)
 
 ## v0.6.2 control changes
 

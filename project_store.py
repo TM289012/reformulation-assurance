@@ -13,11 +13,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 import json
-import sqlite3
 import uuid
 
 import numpy as np
 import pandas as pd
+
+from db_backend import Database
 
 
 def _now() -> str:
@@ -55,27 +56,29 @@ def loads(value: str | None, default: Any = None) -> Any:
 
 class ProjectStore:
     def __init__(self, database_path: str | Path):
-        self.database_path = Path(database_path)
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        """Open (and migrate) the store.
+
+        ``database_path`` is a SQLite file path (the default, local-first
+        deployment) or a ``postgresql://`` URL for the hosted deployment; see
+        ``db_backend``. ``self.database_path`` stays a ``Path`` for SQLite and
+        is ``None`` on PostgreSQL, where file-based backups do not apply.
+        """
+        self.database = Database(database_path)
+        self.database_path = self.database.path
         self._initialize()
+
+    @property
+    def backend(self) -> str:
+        return self.database.backend
 
     @contextmanager
     def connection(self):
-        con = sqlite3.connect(self.database_path)
-        con.row_factory = sqlite3.Row
-        con.execute("PRAGMA foreign_keys = ON")
-        try:
+        with self.database.connect() as con:
             yield con
-            con.commit()
-        except Exception:
-            con.rollback()
-            raise
-        finally:
-            con.close()
 
     @staticmethod
-    def _column_names(con: sqlite3.Connection, table: str) -> set[str]:
-        return {row[1] for row in con.execute(f"PRAGMA table_info({table})").fetchall()}
+    def _column_names(con: Any, table: str) -> set[str]:
+        return con.table_columns(table)
 
     def _initialize(self) -> None:
         with self.connection() as con:
@@ -281,12 +284,19 @@ class ProjectStore:
                     replicate_group = str(row.get(replicate_column))
                 experiment_id = str(uuid.uuid4())
                 con.execute(
-                    """INSERT OR REPLACE INTO experiments
+                    """INSERT INTO experiments
                     (id, project_id, batch_id, experiment_code, source_type, purpose,
                      qualification_stage, status, inputs_json, responses_json,
                      recommendation_json, notes, replicate_group, replicate_index,
                      parent_experiment_id, created_at, updated_at)
-                    VALUES (?, ?, NULL, ?, 'historical', NULL, 'historical', ?, ?, ?, '{}', ?, ?, 1, NULL, ?, ?)""",
+                    VALUES (?, ?, NULL, ?, 'historical', NULL, 'historical', ?, ?, ?, '{}', ?, ?, 1, NULL, ?, ?)
+                    ON CONFLICT(project_id, experiment_code) DO UPDATE SET
+                        status = excluded.status,
+                        inputs_json = excluded.inputs_json,
+                        responses_json = excluded.responses_json,
+                        notes = excluded.notes,
+                        replicate_group = excluded.replicate_group,
+                        updated_at = excluded.updated_at""",
                     (
                         experiment_id,
                         project_id,

@@ -30,6 +30,8 @@ def _clean_row(row: sqlite3.Row) -> dict[str, Any]:
 
 
 def create_postgres_migration_bundle(database_path: str | Path) -> tuple[bytes, dict[str, Any]]:
+    if database_path is None:
+        raise ValueError("The migration bundle exports a local SQLite database; this deployment already runs on PostgreSQL.")
     database_path = Path(database_path)
     con = sqlite3.connect(database_path)
     con.row_factory = sqlite3.Row

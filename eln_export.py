@@ -1,4 +1,4 @@
-"""ELN archive export (.eln, RO-Crate) for Reformulation Assurance v0.11.0.
+"""ELN archive export (.eln, RO-Crate) for Reformulation Assurance v0.12.0.
 
 An .eln file is a zipped RO-Crate: a single root folder holding a
 ``ro-crate-metadata.json`` that describes everything beside it. It is the
@@ -40,11 +40,17 @@ from dossier import _canonical_json, _table_html, generate_dossier, generate_wor
 from product_store import ProductStore
 
 SOFTWARE_NAME = "Reformulation Assurance"
-SOFTWARE_VERSION = "0.11.0"
+SOFTWARE_VERSION = "0.12.0"
 SOFTWARE_URL = "https://github.com/TM289012/reformulation-assurance"
 ELN_MEDIA_TYPE = "application/vnd.eln+zip"
+# The ELN file format (1.2+202609) pins RO-Crate 1.2, but the consortium's own
+# validator still checks against the 1.1 profile, and every importer verified
+# against this exporter reads 1.1 crates. The crate stays on 1.1 until the
+# validator moves; everything else follows the 202609 wording (keywords as a
+# comma-separated string, every importable File listed in the root hasPart).
 RO_CRATE_CONTEXT = "https://w3id.org/ro/crate/1.1/context"
 RO_CRATE_CONFORMS_TO = "https://w3id.org/ro/crate/1.1"
+ELN_FORMAT_DESCRIPTOR_VERSION = "1.0"
 
 _MEDIA_TYPES = {
     ".html": "text/html",
@@ -233,10 +239,19 @@ def generate_eln(
 
     dossier_bytes, dossier_manifest = generate_dossier(store, project_id, generated_by_user_id=generated_by_user_id)
     files: dict[str, bytes] = {}
+    omitted_empty: list[str] = []
     with ZipFile(BytesIO(dossier_bytes)) as archive:
         for member in archive.namelist():
-            if not member.endswith("/"):
-                files[member] = archive.read(member)
+            if member.endswith("/"):
+                continue
+            content = archive.read(member)
+            # Empty evidence tables (a project with no approvals yet, say) stay in the
+            # dossier ZIP for parity, but attaching zero-byte files to a notebook entry
+            # is clutter; the checksum list still names them.
+            if len(content) == 0 and member.endswith(".csv"):
+                omitted_empty.append(member)
+                continue
+            files[member] = content
     if include_workbook:
         workbook_bytes, _ = generate_workbook(store, project_id, generated_by_user_id=generated_by_user_id)
         files[f"{_slug(project['name'])}_workbench_export.xlsx"] = workbook_bytes
@@ -341,7 +356,8 @@ def generate_eln(
         "dateModified": generated_at,
         "temporal": generated_at,
         "text": body_html,
-        "keywords": ["reformulation assurance", "qualification dossier", "formulation"],
+        # Comma-separated string, as the ELN format requires (importers split on ",").
+        "keywords": "reformulation assurance, qualification dossier, formulation",
         "url": SOFTWARE_URL,
         "hasPart": [{"@id": node["@id"]} for node in file_nodes],
         "variableMeasured": property_values,
@@ -352,13 +368,11 @@ def generate_eln(
         "name": SOFTWARE_NAME,
         "url": SOFTWARE_URL,
     }
-    person_node = {
-        "@id": author_id,
-        "@type": "Person",
-        "givenName": given_name,
-        "familyName": family_name,
-        "name": generated_by,
-    }
+    person_node = {"@id": author_id, "@type": "Person", "name": generated_by}
+    if given_name:
+        person_node["givenName"] = given_name
+    if family_name:
+        person_node["familyName"] = family_name
     if user.get("email"):
         person_node["email"] = str(user["email"])
     graph = [
@@ -367,6 +381,7 @@ def generate_eln(
             "@type": "CreativeWork",
             "about": {"@id": "./"},
             "conformsTo": {"@id": RO_CRATE_CONFORMS_TO},
+            "version": ELN_FORMAT_DESCRIPTOR_VERSION,
             "dateCreated": generated_at,
             "sdPublisher": {"@id": SOFTWARE_URL},
         },
@@ -377,9 +392,17 @@ def generate_eln(
             "description": (
                 f"Qualification evidence for '{project['name']}' exported from {SOFTWARE_NAME} "
                 f"v{SOFTWARE_VERSION} as one notebook entry with attached evidence files."
+                + (
+                    " Empty evidence tables are listed in SHA256SUMS.txt but not attached: "
+                    + ", ".join(sorted(omitted_empty)) + "."
+                    if omitted_empty else ""
+                )
             ),
             "datePublished": generated_at,
-            "hasPart": [{"@id": experiment_id}],
+            # The root hasPart is the import list: the experiment entry first, then every
+            # attached file, each of which the entry also lists (spec 1.2+202609). Importers
+            # that create one record per root Dataset skip the File entries here.
+            "hasPart": [{"@id": experiment_id}, *({"@id": node["@id"]} for node in file_nodes)],
         },
         organization_node,
         person_node,
@@ -416,6 +439,7 @@ def generate_eln(
         "archive_sha256": sha256(eln_bytes).hexdigest(),
         "file_count": len(files),
         "files": file_manifest,
+        "omitted_empty_files": sorted(omitted_empty),
         "workbook_included": bool(include_workbook),
     }
     store.audit(

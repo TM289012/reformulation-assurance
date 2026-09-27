@@ -28,6 +28,11 @@ def create_backup(
     """Create a transactionally consistent SQLite backup, package it, encrypt it, and verify it."""
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_db = Path(temp_dir) / "reformulation_assurance.db"
+        if store.database_path is None:
+            raise ValueError(
+                "File backups apply to the local SQLite deployment; on a hosted PostgreSQL "
+                "deployment, backups are managed by the database provider."
+            )
         source = sqlite3.connect(store.database_path)
         target = sqlite3.connect(temp_db)
         try:
