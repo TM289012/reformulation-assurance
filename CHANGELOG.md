@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.2 (2026-09-27)
+
+- **Mail goes out immediately when SMTP is configured.** Password-reset links and invitations (single and roster) are now delivered at the moment they are created instead of waiting for an admin to open the Team page. Without SMTP, behaviour is unchanged: messages wait in the outbox.
+- `hosted.py`: a second entry point for Streamlit Community Cloud, which allows one app per repository, branch and file; the public demo keeps `app.py`, a hosted workspaces instance deploys from `hosted.py` (documented in DEPLOY.md).
+
 ## v0.12.1 (2026-09-27)
 
 - **Replicate screen: identical sibling readings no longer flag a value one step away.** In v0.12.0 the leave-one-out screen treated identical readings among the other replicates as proof of zero variation, so pH 5.4, 5.4 then 5.3 was reported as "replicate #3 inconsistent". Identical readings only show variation below the instrument's resolution; limits built from them have no width and cannot judge anything. Such values are now reported as unjudged by the screen (the note says so) and are left to the CV check, which still fails a genuinely wild value. Spread among the siblings still catches an outlier as before. Found while preparing the example archive for the ELN Consortium listing.

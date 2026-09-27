@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.12.1."""
+"""Streamlit application for Reformulation Assurance v0.12.2."""
 from __future__ import annotations
 
 import os
@@ -70,10 +70,10 @@ DATABASE_URL = _setting("REFORMULATION_DATABASE_URL").strip()
 OPEN_SIGNUP = _flag("REFORMULATION_OPEN_SIGNUP")
 PUBLIC_URL = _setting("REFORMULATION_PUBLIC_URL", "http://localhost:8501")
 
-st.set_page_config(page_title="Reformulation Assurance v0.12.1", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.12.2", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.12.1 · design → run → verify → qualify → approve → export")
+st.caption("v0.12.2 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
@@ -252,7 +252,12 @@ def authentication_screen() -> dict[str, Any]:
             requested = st.form_submit_button("Create reset link")
         if requested:
             store.request_password_reset(reset_email, base_url=PUBLIC_URL)
-            st.success("If the account exists, a reset message was added to the email outbox.")
+            # Send right away when mail is configured; otherwise the message waits in the outbox.
+            delivered = deliver_queued_notifications(store)
+            if delivered["sent"]:
+                st.success("If the account exists, a reset link has been emailed to it.")
+            else:
+                st.success("If the account exists, a reset message was added to the email outbox.")
         st.markdown("#### Use a reset token")
         with st.form("complete_reset"):
             reset_token = st.text_input("Reset token", value=reset_default)
@@ -445,7 +450,11 @@ if page == "Team":
                 base_url=PUBLIC_URL,
                 expires_hours=int(expires_hours),
             )
-            st.success("Invitation created and queued for delivery.")
+            delivered = deliver_queued_notifications(store)
+            if delivered["sent"]:
+                st.success("Invitation created and emailed.")
+            else:
+                st.success("Invitation created and queued for delivery.")
             st.code(invitation["invite_url"])
         except Exception as exc:
             st.error(str(exc))
@@ -468,6 +477,7 @@ if page == "Team":
                 organization_id, emails=emails, role=roster_role, actor_user_id=current_user["id"],
                 base_url=PUBLIC_URL, expires_hours=int(roster_hours),
             )
+            deliver_queued_notifications(store, limit=max(25, len(roster)))
             st.session_state["roster_result"] = roster
     roster_result = st.session_state.get("roster_result")
     if roster_result is not None and not roster_result.empty:
