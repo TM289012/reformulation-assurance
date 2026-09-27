@@ -37,7 +37,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 
 1. **Create the database.** Sign in at neon.tech, create a project (pick the region closest to your users; Community Cloud apps run in the United States), and copy the connection string from the project dashboard. Use the **pooled** connection string if it is offered; the app does not use server-side prepared statements, so it works behind Neon's PgBouncer endpoint. The Free plan (as of September 2026: 0.5 GB per project, 100 compute-hours a month, compute suspends after five idle minutes and wakes on the next query) is enough for a handful of small labs or one course.
 
-2. **Deploy the app.** At share.streamlit.io, choose *Create app*, point it at your fork of this repository, branch `main`, main file `app.py`. Community Cloud installs `requirements.txt`, which already includes `psycopg[binary]`. Under *Advanced settings → Secrets*, paste:
+2. **Deploy the app.** At share.streamlit.io, choose *Create app*, point it at your fork of this repository, branch `main`, main file `hosted.py` (Community Cloud allows one app per repository, branch and file, and `app.py` is usually taken by a public demo; `hosted.py` runs `app.py` unchanged). Community Cloud installs `requirements.txt`, which already includes `psycopg[binary]`. Under *Advanced settings → Secrets*, paste:
 
    ```toml
    REFORMULATION_DATABASE_URL = "postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require"
