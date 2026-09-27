@@ -8,7 +8,9 @@ When an ingredient gets discontinued or restricted, proving the replacement work
 
 Reformulation Assurance is an open-source, local-first workbench for ingredient-replacement projects in formulated products: coatings, adhesives, sealants — anything mixed to a specification. It takes a team from "our supplier discontinued this plasticizer" to a qualified replacement, with every experiment, model prediction, approval, and decision recorded along the way.
 
-It runs entirely on your machine. Your formulations live in a SQLite file you own. Nothing is uploaded anywhere, there is no telemetry, and there is no cloud account — which matters, because formulations are usually the most confidential thing a company has. (Teams and courses that would rather not install anything can run one shared instance on PostgreSQL with self-serve workspaces; see [DEPLOY.md](DEPLOY.md).)
+It runs entirely on your machine. Your formulations live in a SQLite file you own. Nothing is uploaded anywhere, there is no telemetry, and there is no cloud account — which matters, because formulations are usually the most confidential thing a company has.
+
+**Prefer not to install anything?** A hosted instance with private, self-serve workspaces is at [reformulation-assurance.streamlit.app](https://reformulation-assurance.streamlit.app): create a workspace, invite your team or your students, free while it is in pilot. It is a shared server without MFA or SSO, so keep trade-secret formulations on the local install. To run your own instance, see [DEPLOY.md](DEPLOY.md).
 
 **It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep — CSV evidence tables, a printable dossier, the signed evidence snapshots, an Excel workbook, or a single `.eln` archive that imports into eLabFTW, RSpace and other lab notebooks as one entry. Local files in, local files out, no lock-in.
 
