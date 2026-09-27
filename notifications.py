@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from email.message import EmailMessage
 import os
 import smtplib
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass(frozen=True)
@@ -23,19 +23,29 @@ class SMTPSettings:
     use_tls: bool = True
 
     @classmethod
-    def from_environment(cls) -> "SMTPSettings | None":
-        host = os.environ.get("REFORMULATION_SMTP_HOST", "").strip()
-        sender = os.environ.get("REFORMULATION_EMAIL_FROM", "").strip()
+    def from_settings(cls, get: Callable[[str], str]) -> "SMTPSettings | None":
+        """Build from any settings source: ``get(name)`` returns the value or ``""``.
+
+        The app passes its own reader (environment first, then Streamlit secrets),
+        so a hosted deployment works whether or not the platform copies secrets
+        into environment variables.
+        """
+        host = (get("REFORMULATION_SMTP_HOST") or "").strip()
+        sender = (get("REFORMULATION_EMAIL_FROM") or "").strip()
         if not host or not sender:
             return None
         return cls(
             host=host,
-            port=int(os.environ.get("REFORMULATION_SMTP_PORT", "587")),
-            username=os.environ.get("REFORMULATION_SMTP_USERNAME") or None,
-            password=os.environ.get("REFORMULATION_SMTP_PASSWORD") or None,
+            port=int((get("REFORMULATION_SMTP_PORT") or "587").strip()),
+            username=(get("REFORMULATION_SMTP_USERNAME") or "").strip() or None,
+            password=get("REFORMULATION_SMTP_PASSWORD") or None,
             sender=sender,
-            use_tls=os.environ.get("REFORMULATION_SMTP_TLS", "true").lower() not in {"0", "false", "no"},
+            use_tls=(get("REFORMULATION_SMTP_TLS") or "true").strip().lower() not in {"0", "false", "no"},
         )
+
+    @classmethod
+    def from_environment(cls) -> "SMTPSettings | None":
+        return cls.from_settings(lambda name: os.environ.get(name, ""))
 
 
 def send_email(recipient: str, subject: str, body: str, settings: SMTPSettings) -> None:
@@ -52,8 +62,10 @@ def send_email(recipient: str, subject: str, body: str, settings: SMTPSettings) 
         client.send_message(message)
 
 
-def deliver_queued_notifications(store: Any, *, limit: int = 25) -> dict[str, int]:
-    settings = SMTPSettings.from_environment()
+def deliver_queued_notifications(
+    store: Any, *, limit: int = 25, settings: "SMTPSettings | None" = None
+) -> dict[str, int]:
+    settings = settings or SMTPSettings.from_environment()
     if settings is None:
         return {"sent": 0, "failed": 0, "queued": int(len(store.list_notifications(status="queued", limit=limit)))}
     sent = failed = 0

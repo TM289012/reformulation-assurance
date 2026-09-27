@@ -160,5 +160,25 @@ class SelfServeWorkspaceTest(unittest.TestCase):
         self.assertIsNone(self.store.authenticate("new@example.com", "short"))
 
 
+class SmtpSettingsTest(unittest.TestCase):
+    def test_settings_come_from_any_reader_not_only_the_environment(self):
+        from notifications import SMTPSettings
+
+        values = {
+            "REFORMULATION_SMTP_HOST": "smtp.example.com",
+            "REFORMULATION_SMTP_PORT": "587",
+            "REFORMULATION_SMTP_USERNAME": "mailer@example.com",
+            "REFORMULATION_SMTP_PASSWORD": "app-password",
+            "REFORMULATION_SMTP_TLS": "true",
+            "REFORMULATION_EMAIL_FROM": "mailer@example.com",
+        }
+        settings = SMTPSettings.from_settings(lambda name: values.get(name, ""))
+        self.assertEqual((settings.host, settings.port, settings.username, settings.sender, settings.use_tls),
+                         ("smtp.example.com", 587, "mailer@example.com", "mailer@example.com", True))
+        self.assertIsNone(SMTPSettings.from_settings(lambda name: ""))
+        # Host without a sender (or the reverse) is not a usable configuration.
+        self.assertIsNone(SMTPSettings.from_settings(lambda name: "smtp.example.com" if name.endswith("HOST") else ""))
+
+
 if __name__ == "__main__":
     unittest.main()

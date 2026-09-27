@@ -27,7 +27,7 @@ from dossier import evidence_snapshot_and_hash, generate_dossier, generate_workb
 from eln_export import ELN_MEDIA_TYPE, generate_eln
 from artifact_vault import ArtifactVault
 from backup_service import create_backup
-from notifications import deliver_queued_notifications
+from notifications import SMTPSettings, deliver_queued_notifications
 from postgres_migration import create_postgres_migration_bundle
 from ingestion import import_readiness_report, load_table, workbook_preview
 from pilot_store import ADMIN_ROLES, APPROVAL_ROLES, EDIT_ROLES, PilotStore, ROLES, PRIORITIES, TASK_STATUSES
@@ -69,6 +69,8 @@ DATABASE_URL = _setting("REFORMULATION_DATABASE_URL").strip()
 # so a private/local install still has exactly one owner-created workspace.
 OPEN_SIGNUP = _flag("REFORMULATION_OPEN_SIGNUP")
 PUBLIC_URL = _setting("REFORMULATION_PUBLIC_URL", "http://localhost:8501")
+# Outgoing mail, read like every other setting (environment, then Streamlit secrets).
+SMTP_SETTINGS = SMTPSettings.from_settings(_setting)
 
 st.set_page_config(page_title="Reformulation Assurance v0.12.2", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
@@ -253,7 +255,7 @@ def authentication_screen() -> dict[str, Any]:
         if requested:
             store.request_password_reset(reset_email, base_url=PUBLIC_URL)
             # Send right away when mail is configured; otherwise the message waits in the outbox.
-            delivered = deliver_queued_notifications(store)
+            delivered = deliver_queued_notifications(store, settings=SMTP_SETTINGS)
             if delivered["sent"]:
                 st.success("If the account exists, a reset link has been emailed to it.")
             else:
@@ -450,7 +452,7 @@ if page == "Team":
                 base_url=PUBLIC_URL,
                 expires_hours=int(expires_hours),
             )
-            delivered = deliver_queued_notifications(store)
+            delivered = deliver_queued_notifications(store, settings=SMTP_SETTINGS)
             if delivered["sent"]:
                 st.success("Invitation created and emailed.")
             else:
@@ -477,7 +479,7 @@ if page == "Team":
                 organization_id, emails=emails, role=roster_role, actor_user_id=current_user["id"],
                 base_url=PUBLIC_URL, expires_hours=int(roster_hours),
             )
-            deliver_queued_notifications(store, limit=max(25, len(roster)))
+            deliver_queued_notifications(store, limit=max(25, len(roster)), settings=SMTP_SETTINGS)
             st.session_state["roster_result"] = roster
     roster_result = st.session_state.get("roster_result")
     if roster_result is not None and not roster_result.empty:
@@ -498,7 +500,7 @@ if page == "Team":
         st.markdown("### Invitation history")
         st.dataframe(invitations[["email", "role", "status", "expires_at", "invited_by", "created_at"]], use_container_width=True, hide_index=True)
     st.markdown("### Email outbox")
-    delivery = deliver_queued_notifications(store)
+    delivery = deliver_queued_notifications(store, settings=SMTP_SETTINGS)
     if delivery["queued"]:
         st.info(f"{delivery['queued']} message(s) are queued. Configure SMTP environment variables to deliver them.")
     notifications = store.list_outbox(organization_id, current_user["id"], limit=50)
