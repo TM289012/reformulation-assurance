@@ -500,9 +500,22 @@ if page == "Team":
         st.markdown("### Invitation history")
         st.dataframe(invitations[["email", "role", "status", "expires_at", "invited_by", "created_at"]], use_container_width=True, hide_index=True)
     st.markdown("### Email outbox")
+    if SMTP_SETTINGS is None:
+        present = [name for name in ("REFORMULATION_SMTP_HOST", "REFORMULATION_EMAIL_FROM") if _setting(name).strip()]
+        missing = [name for name in ("REFORMULATION_SMTP_HOST", "REFORMULATION_EMAIL_FROM") if not _setting(name).strip()]
+        st.caption(
+            "Outgoing mail: not configured. Messages wait here until it is. "
+            + (f"Found: {', '.join(present)}. " if present else "")
+            + f"Missing: {', '.join(missing)}. Settings are read from the environment, then Streamlit secrets."
+        )
+    else:
+        st.caption(
+            f"Outgoing mail: configured, sending through {SMTP_SETTINGS.host}:{SMTP_SETTINGS.port} "
+            f"as {SMTP_SETTINGS.sender}."
+        )
     delivery = deliver_queued_notifications(store, settings=SMTP_SETTINGS)
     if delivery["queued"]:
-        st.info(f"{delivery['queued']} message(s) are queued. Configure SMTP environment variables to deliver them.")
+        st.info(f"{delivery['queued']} message(s) are queued. Configure the mail settings to deliver them.")
     notifications = store.list_outbox(organization_id, current_user["id"], limit=50)
     if not notifications.empty:
         notifications = notifications.copy()
