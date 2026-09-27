@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.12.3 (2026-09-27)
+
+- **Mail failures are explained where the administrator looks.** The Team page's outbox now shows why a message failed in plain language next to its status (a rejected app password, a missing username, a wrong port, a blocked or unreachable host), lists how many messages failed since the last successful send, and offers a *Retry failed messages* button once the settings are fixed. Failed password resets are counted without exposing their recipients or links.
+- **Send a test email.** One click on the Team page sends a short message to the signed-in administrator's own address through the outbox, so a new configuration can be checked without inviting anyone.
+- **Implicit TLS (port 465) is supported.** `REFORMULATION_SMTP_PORT=465` now connects with TLS from the first byte automatically; `REFORMULATION_SMTP_SSL` overrides the choice. Values pasted with stray spaces or newlines are trimmed, and a non-numeric port is reported on the Team page instead of stopping the app.
+- The invitation and roster forms say what actually happened: emailed, or created but not emailed (with the reason), or created on an instance without mail. The password-reset form's wording depends only on the instance's configuration, never on whether the account exists.
+- Suite grows to 88 with `tests/test_mail_delivery.py` (transport selection, error translation, retry from the outbox, admin-only diagnostics).
+
 ## v0.12.2 (2026-09-27)
 
 - **Mail goes out immediately when SMTP is configured.** Password-reset links and invitations (single and roster) are now delivered at the moment they are created instead of waiting for an admin to open the Team page. Without SMTP, behaviour is unchanged: messages wait in the outbox.

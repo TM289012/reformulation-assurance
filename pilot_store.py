@@ -251,6 +251,59 @@ class PilotStore(ProductStore):
                 (status, error[:1000], _now() if status == "sent" else None, notification_id),
             )
 
+    def delivery_failures(self, organization_id: str, actor_user_id: str) -> dict[str, Any]:
+        """What an administrator needs to know about mail that did not go out.
+
+        Counts this organization's failed messages plus failed password resets (a count only:
+        their recipients and links are never exposed), restricted to messages created since
+        the last successful send anywhere on the instance, so a fixed configuration clears
+        the warning by itself. ``last_error`` is the newest plain-language failure reason.
+        """
+        self.require_role(actor_user_id, organization_id, ADMIN_ROLES)
+        with self.connection() as con:
+            last_success = con.execute(
+                "SELECT MAX(sent_at) AS last_sent FROM notifications WHERE status = 'sent'"
+            ).fetchone()["last_sent"] or ""
+            own = con.execute(
+                "SELECT COUNT(*) AS n FROM notifications WHERE organization_id = ? AND status = 'failed' "
+                "AND kind != 'password_reset' AND created_at >= ?",
+                (organization_id, last_success),
+            ).fetchone()["n"]
+            resets = con.execute(
+                "SELECT COUNT(*) AS n FROM notifications WHERE kind = 'password_reset' AND status = 'failed' "
+                "AND created_at >= ?",
+                (last_success,),
+            ).fetchone()["n"]
+            latest = con.execute(
+                "SELECT error, created_at FROM notifications WHERE status = 'failed' AND created_at >= ? "
+                "AND (organization_id = ? OR kind = 'password_reset') ORDER BY created_at DESC LIMIT 1",
+                (last_success, organization_id),
+            ).fetchone()
+        return {
+            "messages": int(own or 0),
+            "password_resets": int(resets or 0),
+            "last_error": str(latest["error"]) if latest is not None else "",
+            "last_failed_at": str(latest["created_at"]) if latest is not None else "",
+            "last_success_at": str(last_success),
+        }
+
+    def requeue_failed_notifications(self, organization_id: str, actor_user_id: str) -> int:
+        """Put this organization's failed messages back in the queue, for a retry after the
+        mail settings were fixed. Password resets are not touched: their links expire within
+        minutes, so the person simply requests a new one. Returns the number requeued."""
+        self.require_role(actor_user_id, organization_id, ADMIN_ROLES)
+        with self.connection() as con:
+            rows = con.execute(
+                "SELECT id FROM notifications WHERE organization_id = ? AND status = 'failed' AND kind != 'password_reset'",
+                (organization_id,),
+            ).fetchall()
+            for row in rows:
+                con.execute(
+                    "UPDATE notifications SET status = 'queued', error = '', sent_at = NULL WHERE id = ?",
+                    (row["id"],),
+                )
+        return len(rows)
+
     def create_invitation(
         self,
         organization_id: str,

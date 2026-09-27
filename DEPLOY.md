@@ -24,7 +24,7 @@ All settings are read from environment variables first, then from Streamlit secr
 | `REFORMULATION_OPEN_SIGNUP` | `true` adds a **Create a workspace** tab to the sign-in screen. Off by default. |
 | `REFORMULATION_ARTIFACT_KEY` | Fernet key that encrypts stored exports. **Required for hosted mode**; without it a key is generated on the server's disposable disk and everything encrypted with it becomes unreadable at the next redeploy. The app shows a red banner to owners while this is missing. |
 | `REFORMULATION_PUBLIC_URL` | The app's public address, used to build invitation and password-reset links. |
-| `REFORMULATION_SMTP_HOST`, `REFORMULATION_SMTP_PORT`, `REFORMULATION_SMTP_USERNAME`, `REFORMULATION_SMTP_PASSWORD`, `REFORMULATION_SMTP_TLS`, `REFORMULATION_EMAIL_FROM` | Outgoing mail for invitations and password resets. Without SMTP, invitation links stay in the workspace outbox (Team page) and an admin can pass them on by hand; password-reset links are deliberately never shown in the app, so resets need SMTP. |
+| `REFORMULATION_SMTP_HOST`, `REFORMULATION_SMTP_PORT`, `REFORMULATION_SMTP_USERNAME`, `REFORMULATION_SMTP_PASSWORD`, `REFORMULATION_SMTP_TLS`, `REFORMULATION_SMTP_SSL`, `REFORMULATION_EMAIL_FROM` | Outgoing mail for invitations and password resets. Without SMTP, invitation links stay in the workspace outbox (Team page) and an admin can pass them on by hand; password-reset links are deliberately never shown in the app, so resets need SMTP. Port 587 uses STARTTLS; port 465 uses TLS from the first byte automatically (`REFORMULATION_SMTP_SSL=true`/`false` overrides). |
 | `REFORMULATION_DEMO_MODE` | Public sandbox with the demo project preloaded and a one-click demo login. Never combine with a real database. |
 
 Generate an artifact key once and keep it somewhere safe (a password manager); losing it means losing every stored encrypted export:
@@ -46,7 +46,17 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
    REFORMULATION_PUBLIC_URL = "https://your-app-name.streamlit.app"
    ```
 
-   Add the SMTP settings as soon as you have a sending account (any transactional mail provider's SMTP credentials work; a personal mailbox with an app password is fine for a pilot). Until then, nobody can reset a forgotten password on this instance.
+   Add the SMTP settings as soon as you have a sending account (any transactional mail provider's SMTP credentials work; a personal mailbox with an app password is fine for a pilot). Until then, nobody can reset a forgotten password on this instance. For a Gmail account:
+
+   ```toml
+   REFORMULATION_SMTP_HOST = "smtp.gmail.com"
+   REFORMULATION_SMTP_PORT = "587"
+   REFORMULATION_SMTP_USERNAME = "you@gmail.com"
+   REFORMULATION_SMTP_PASSWORD = "the 16-character app password"
+   REFORMULATION_EMAIL_FROM = "you@gmail.com"
+   ```
+
+   The app password comes from Google Account → Security → 2-Step Verification → App passwords (2-step verification must be on; the normal account password is refused). Then open the Team page and press **Send a test email** to yourself: the page reports success, or the exact reason the server gave. If port 587 times out on your host, try `REFORMULATION_SMTP_PORT = "465"`.
 
 3. **Create the first workspace.** Open the app. Because the database is empty you get the *Create the first workspace owner* form; this account is simply the first owner, it has no special powers over other workspaces. Then confirm the sign-in screen shows four tabs: *Sign in*, *Create a workspace*, *Accept invitation*, *Reset password*.
 

@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.12.2."""
+"""Streamlit application for Reformulation Assurance v0.12.3."""
 from __future__ import annotations
 
 import os
@@ -27,7 +27,13 @@ from dossier import evidence_snapshot_and_hash, generate_dossier, generate_workb
 from eln_export import ELN_MEDIA_TYPE, generate_eln
 from artifact_vault import ArtifactVault
 from backup_service import create_backup
-from notifications import SMTPSettings, deliver_queued_notifications
+from notifications import (
+    TEST_MESSAGE_KIND,
+    TEST_MESSAGE_SUBJECT,
+    SMTPSettings,
+    deliver_queued_notifications,
+    test_message_body,
+)
 from postgres_migration import create_postgres_migration_bundle
 from ingestion import import_readiness_report, load_table, workbook_preview
 from pilot_store import ADMIN_ROLES, APPROVAL_ROLES, EDIT_ROLES, PilotStore, ROLES, PRIORITIES, TASK_STATUSES
@@ -70,12 +76,17 @@ DATABASE_URL = _setting("REFORMULATION_DATABASE_URL").strip()
 OPEN_SIGNUP = _flag("REFORMULATION_OPEN_SIGNUP")
 PUBLIC_URL = _setting("REFORMULATION_PUBLIC_URL", "http://localhost:8501")
 # Outgoing mail, read like every other setting (environment, then Streamlit secrets).
-SMTP_SETTINGS = SMTPSettings.from_settings(_setting)
+try:
+    SMTP_SETTINGS = SMTPSettings.from_settings(_setting)
+    SMTP_PROBLEM = ""
+except ValueError as exc:  # a malformed value must not take the whole app down
+    SMTP_SETTINGS = None
+    SMTP_PROBLEM = str(exc)
 
-st.set_page_config(page_title="Reformulation Assurance v0.12.2", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.12.3", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.12.2 · design → run → verify → qualify → approve → export")
+st.caption("v0.12.3 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
@@ -255,11 +266,20 @@ def authentication_screen() -> dict[str, Any]:
         if requested:
             store.request_password_reset(reset_email, base_url=PUBLIC_URL)
             # Send right away when mail is configured; otherwise the message waits in the outbox.
-            delivered = deliver_queued_notifications(store, settings=SMTP_SETTINGS)
-            if delivered["sent"]:
-                st.success("If the account exists, a reset link has been emailed to it.")
+            # The wording depends only on the instance's configuration, never on whether the
+            # account exists, so this form cannot be used to probe for addresses.
+            deliver_queued_notifications(store, settings=SMTP_SETTINGS)
+            if SMTP_SETTINGS is not None:
+                st.success(
+                    "If an account exists for that address, a reset link is on its way. If nothing arrives in a "
+                    "few minutes, check the spam folder or ask a workspace administrator: the Team page shows "
+                    "whether this instance's outgoing mail is working."
+                )
             else:
-                st.success("If the account exists, a reset message was added to the email outbox.")
+                st.success(
+                    "If an account exists for that address, a reset message was added to the outbox. This "
+                    "instance has no outgoing mail configured, so ask the person who runs it to complete the reset."
+                )
         st.markdown("#### Use a reset token")
         with st.form("complete_reset"):
             reset_token = st.text_input("Reset token", value=reset_default)
@@ -453,10 +473,15 @@ if page == "Team":
                 expires_hours=int(expires_hours),
             )
             delivered = deliver_queued_notifications(store, settings=SMTP_SETTINGS)
-            if delivered["sent"]:
-                st.success("Invitation created and emailed.")
+            if SMTP_SETTINGS is None:
+                st.success("Invitation created. Outgoing mail is not configured on this instance, so pass the link below on by hand.")
+            elif delivered["failed"]:
+                st.warning(
+                    f"Invitation created, but emailing it failed. {delivered['errors'][-1]} "
+                    "Pass the link below on by hand, or fix the mail settings and use *Retry failed messages* in the outbox."
+                )
             else:
-                st.success("Invitation created and queued for delivery.")
+                st.success("Invitation created and emailed.")
             st.code(invitation["invite_url"])
         except Exception as exc:
             st.error(str(exc))
@@ -479,12 +504,24 @@ if page == "Team":
                 organization_id, emails=emails, role=roster_role, actor_user_id=current_user["id"],
                 base_url=PUBLIC_URL, expires_hours=int(roster_hours),
             )
-            deliver_queued_notifications(store, limit=max(25, len(roster)), settings=SMTP_SETTINGS)
+            st.session_state["roster_delivery"] = deliver_queued_notifications(
+                store, limit=max(25, len(roster)), settings=SMTP_SETTINGS
+            )
             st.session_state["roster_result"] = roster
     roster_result = st.session_state.get("roster_result")
     if roster_result is not None and not roster_result.empty:
         invited = int((roster_result["status"] == "invited").sum())
         st.success(f"{invited} invitation(s) created, {len(roster_result) - invited} skipped.")
+        roster_delivery = st.session_state.get("roster_delivery") or {}
+        if SMTP_SETTINGS is None:
+            st.caption("Outgoing mail is not configured on this instance: share the links below yourself.")
+        elif roster_delivery.get("failed"):
+            st.warning(
+                f"{roster_delivery['failed']} message(s) could not be emailed. {roster_delivery['errors'][-1]} "
+                "The links below still work; fix the mail settings and use *Retry failed messages* in the outbox."
+            )
+        elif roster_delivery.get("sent"):
+            st.caption(f"{roster_delivery['sent']} message(s) emailed.")
         st.dataframe(
             roster_result, use_container_width=True, hide_index=True,
             column_config={"invite_url": st.column_config.LinkColumn("Invitation link")},
@@ -500,6 +537,11 @@ if page == "Team":
         st.markdown("### Invitation history")
         st.dataframe(invitations[["email", "role", "status", "expires_at", "invited_by", "created_at"]], use_container_width=True, hide_index=True)
     st.markdown("### Email outbox")
+    flash = st.session_state.pop("mail_flash", None)
+    if flash:
+        getattr(st, flash[0])(flash[1])
+    if SMTP_PROBLEM:
+        st.error(f"Outgoing mail settings are invalid: {SMTP_PROBLEM}")
     if SMTP_SETTINGS is None:
         present = [name for name in ("REFORMULATION_SMTP_HOST", "REFORMULATION_EMAIL_FROM") if _setting(name).strip()]
         missing = [name for name in ("REFORMULATION_SMTP_HOST", "REFORMULATION_EMAIL_FROM") if not _setting(name).strip()]
@@ -509,22 +551,59 @@ if page == "Team":
             + f"Missing: {', '.join(missing)}. Settings are read from the environment, then Streamlit secrets."
         )
     else:
-        st.caption(
-            f"Outgoing mail: configured, sending through {SMTP_SETTINGS.host}:{SMTP_SETTINGS.port} "
-            f"as {SMTP_SETTINGS.sender}."
-        )
+        st.caption(f"Outgoing mail: configured, {SMTP_SETTINGS.describe()}.")
+        if st.button(f"Send a test email to {current_user['email']}"):
+            # The test goes through the outbox like every other message, so its outcome (and the
+            # exact reason if it fails) is recorded where the administrator will look for it.
+            store.queue_notification(
+                recipient_email=current_user["email"], kind=TEST_MESSAGE_KIND, subject=TEST_MESSAGE_SUBJECT,
+                body=test_message_body(SMTP_SETTINGS), organization_id=organization_id,
+            )
+            outcome = deliver_queued_notifications(store, settings=SMTP_SETTINGS)
+            if outcome["failed"]:
+                st.session_state["mail_flash"] = ("error", f"Test email failed. {outcome['errors'][-1]}")
+            else:
+                st.session_state["mail_flash"] = ("success", f"Test email sent to {current_user['email']}. Check the inbox and the spam folder.")
+            st.rerun()
     delivery = deliver_queued_notifications(store, settings=SMTP_SETTINGS)
     if delivery["queued"]:
         st.info(f"{delivery['queued']} message(s) are queued. Configure the mail settings to deliver them.")
+    failures = store.delivery_failures(organization_id, current_user["id"])
+    if failures["messages"] or failures["password_resets"]:
+        counts = []
+        if failures["messages"]:
+            counts.append(f"{failures['messages']} message(s) from this workspace")
+        if failures["password_resets"]:
+            counts.append(f"{failures['password_resets']} password-reset message(s)")
+        st.warning(
+            f"Delivery failed for {' and '.join(counts)} since the last successful send. "
+            f"Last reason ({failures['last_failed_at']}): {failures['last_error']}"
+            + (" People waiting for a password reset should request a new link once mail works."
+               if failures["password_resets"] else "")
+        )
+        if SMTP_SETTINGS is not None and failures["messages"]:
+            if st.button("Retry failed messages"):
+                requeued = store.requeue_failed_notifications(organization_id, current_user["id"])
+                outcome = deliver_queued_notifications(store, limit=max(25, requeued), settings=SMTP_SETTINGS)
+                if outcome["failed"]:
+                    st.session_state["mail_flash"] = (
+                        "error", f"{outcome['sent']} sent, {outcome['failed']} still failing. {outcome['errors'][-1]}"
+                    )
+                else:
+                    st.session_state["mail_flash"] = ("success", f"{outcome['sent']} message(s) sent.")
+                st.rerun()
     notifications = store.list_outbox(organization_id, current_user["id"], limit=50)
     if not notifications.empty:
         notifications = notifications.copy()
         notifications["action_link"] = notifications["body"].map(first_url)
         st.dataframe(
-            notifications[["recipient_email", "kind", "subject", "status", "action_link", "error", "created_at"]],
+            notifications[["recipient_email", "kind", "status", "error", "action_link", "subject", "created_at"]],
             use_container_width=True,
             hide_index=True,
-            column_config={"action_link": st.column_config.LinkColumn("Invitation link")},
+            column_config={
+                "action_link": st.column_config.LinkColumn("Invitation link"),
+                "error": st.column_config.TextColumn("Why it failed", width="large"),
+            },
         )
         with st.expander("Copy a queued message or link"):
             selected_notification = st.selectbox(
@@ -535,6 +614,8 @@ if page == "Team":
             selected_row = notifications[notifications["id"] == selected_notification].iloc[0]
             if selected_row.get("action_link"):
                 st.code(str(selected_row["action_link"]))
+            if str(selected_row.get("error") or ""):
+                st.error(f"Delivery failed: {selected_row['error']}")
             st.text_area("Message body", value=str(selected_row["body"]), height=180, disabled=True)
     st.caption(
         "The outbox shows this organization's invitation links only. Password-reset links are never "

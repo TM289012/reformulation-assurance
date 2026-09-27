@@ -59,7 +59,7 @@ Then take the built-in tour — no data needed:
 3. **Approve and freeze batch**, then go to **Experiment loop**, mark an experiment completed, and enter plausible numbers (e.g. adhesion 8.5, viscosity 2300, dry time 35, gloss 90). Watch the models retrain.
 4. Open **Approvals & dossier**: the evidence hash has changed because the evidence did. Sign the discovery stage (it re-authenticates you and binds the signature to that exact hash), then export the dossier and look inside the zip.
 
-To run the test suite (76 tests):
+To run the test suite (88 tests):
 
 ```bash
 python -m unittest discover -s tests
