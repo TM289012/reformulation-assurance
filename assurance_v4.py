@@ -227,22 +227,29 @@ def result_for_storage(result: Mapping[str, Any]) -> dict[str, Any]:
     return stored
 
 
-def wheeler_screen(values: list[float]) -> tuple[bool | None, int | None]:
-    """Leave-one-out consistency screen for a replicate group.
+def wheeler_screen_detail(values: list[float]) -> dict[str, Any]:
+    """Leave-one-out consistency screen for a replicate group, with its reasons.
 
     Follows Donald Wheeler's procedure for small replicate sets: judge each
     value against natural limits (mean ± 2.66 × average moving range) computed
-    from the OTHER values in run order. Returns (consistent, flagged_index):
-    - (None, None) when there are fewer than 3 values (nothing to screen);
-    - (False, i) when value i falls outside the limits built from its siblings;
-    - (True, None) when every value is consistent with the rest.
+    from the OTHER values in run order. Returns a dict with:
+    - ``consistent``: None when there are fewer than 3 values (nothing to
+      screen); False when some value falls outside the limits built from its
+      siblings; True otherwise.
+    - ``flagged``: the index of the first inconsistent value, else None.
+    - ``unjudged``: indices whose siblings were all identical. Identical
+      readings do not prove zero variation, they show variation below the
+      instrument's resolution (a pH meter reading 5.4 twice), so the limits
+      built from them have no width and cannot judge anything. Those values
+      are left to the CV check rather than flagged.
 
     With 3-6 values the screen is indicative, not definitive — the limits are
     soft at these counts, which is exactly why it screens instead of verdicts.
     """
     n = len(values)
     if n < 3:
-        return None, None
+        return {"consistent": None, "flagged": None, "unjudged": []}
+    unjudged: list[int] = []
     for i in range(n):
         others = values[:i] + values[i + 1 :]
         moving_ranges = [abs(others[j] - others[j - 1]) for j in range(1, len(others))]
@@ -252,13 +259,19 @@ def wheeler_screen(values: list[float]) -> tuple[bool | None, int | None]:
         mr_bar = sum(moving_ranges) / len(moving_ranges)
         if mr_bar == 0.0:
             if abs(values[i] - center) > 1e-12:
-                return False, i
+                unjudged.append(i)
             continue
         upper = center + 2.66 * mr_bar
         lower = center - 2.66 * mr_bar
         if values[i] > upper or values[i] < lower:
-            return False, i
-    return True, None
+            return {"consistent": False, "flagged": i, "unjudged": unjudged}
+    return {"consistent": True, "flagged": None, "unjudged": unjudged}
+
+
+def wheeler_screen(values: list[float]) -> tuple[bool | None, int | None]:
+    """``(consistent, flagged_index)`` view of :func:`wheeler_screen_detail`."""
+    detail = wheeler_screen_detail(values)
+    return detail["consistent"], detail["flagged"]
 
 
 def replicate_summary(
@@ -292,13 +305,20 @@ def replicate_summary(
                 std = float(values.std(ddof=1)) if len(values) > 1 else 0.0
                 record[f"mean_{response}"] = mean
                 record[f"cv_{response}"] = abs(std / mean) if abs(mean) > 1e-12 else np.nan
-                consistent, flagged = wheeler_screen([float(v) for v in values.tolist()])
+                detail = wheeler_screen_detail([float(v) for v in values.tolist()])
+                consistent, flagged, unjudged = detail["consistent"], detail["flagged"], detail["unjudged"]
                 record[f"consistent_{response}"] = consistent
                 if consistent is None:
                     record[f"screen_note_{response}"] = "needs 3+ replicates to screen"
                 elif consistent is False:
                     record[f"screen_note_{response}"] = (
                         f"replicate #{(flagged or 0) + 1} inconsistent with the others"
+                    )
+                elif unjudged:
+                    which = ", ".join(f"#{index + 1}" for index in unjudged)
+                    record[f"screen_note_{response}"] = (
+                        f"replicates consistent; the others read identically so the screen could not "
+                        f"judge replicate {which} (below instrument resolution), the CV check applies"
                     )
                 else:
                     record[f"screen_note_{response}"] = "replicates consistent"

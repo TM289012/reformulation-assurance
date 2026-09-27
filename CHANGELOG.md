@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.12.1 (2026-09-27)
+
+- **Replicate screen: identical sibling readings no longer flag a value one step away.** In v0.12.0 the leave-one-out screen treated identical readings among the other replicates as proof of zero variation, so pH 5.4, 5.4 then 5.3 was reported as "replicate #3 inconsistent". Identical readings only show variation below the instrument's resolution; limits built from them have no width and cannot judge anything. Such values are now reported as unjudged by the screen (the note says so) and are left to the CV check, which still fails a genuinely wild value. Spread among the siblings still catches an outlier as before. Found while preparing the example archive for the ELN Consortium listing.
+
 ## v0.12.0 (2026-09-27)
 
 The hosted release: the same app can now serve several workspaces from one PostgreSQL database, so a lab, a brand or a course can use it without installing anything, while the local SQLite install stays the default and is unchanged. Nothing about the science moved; this release is plumbing plus the two features a course section needs, and it is documented in `DEPLOY.md` and the new for-courses page.

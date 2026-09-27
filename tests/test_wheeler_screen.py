@@ -45,8 +45,25 @@ class WheelerScreenUnitTests(unittest.TestCase):
         self.assertIsNone(consistent)
         self.assertIsNone(flagged)
 
-    def test_identical_others_flag_a_different_value(self):
-        consistent, flagged = wheeler_screen([10.0, 10.0, 10.0, 12.0])
+    def test_identical_others_cannot_judge_a_different_value(self):
+        # Three identical readings say nothing about spread (they sit below the
+        # instrument's resolution), so limits built from them have no width. The
+        # screen must not flag the fourth value; the CV check still applies to it.
+        from assurance_v4 import wheeler_screen_detail
+
+        detail = wheeler_screen_detail([10.0, 10.0, 10.0, 12.0])
+        self.assertTrue(detail["consistent"])
+        self.assertIsNone(detail["flagged"])
+        self.assertEqual(detail["unjudged"], [3])
+
+    def test_one_step_difference_after_identical_readings_is_not_a_flag(self):
+        # A pH meter reading 5.4, 5.4 then 5.3 is ordinary; v0.12.0 flagged this.
+        consistent, flagged = wheeler_screen([5.4, 5.4, 5.3])
+        self.assertTrue(consistent)
+        self.assertIsNone(flagged)
+
+    def test_spread_among_siblings_still_catches_a_wild_value(self):
+        consistent, flagged = wheeler_screen([5.4, 5.3, 5.4, 6.9])
         self.assertFalse(consistent)
         self.assertEqual(flagged, 3)
 

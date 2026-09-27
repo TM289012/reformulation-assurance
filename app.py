@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.12.0."""
+"""Streamlit application for Reformulation Assurance v0.12.1."""
 from __future__ import annotations
 
 import os
@@ -70,10 +70,10 @@ DATABASE_URL = _setting("REFORMULATION_DATABASE_URL").strip()
 OPEN_SIGNUP = _flag("REFORMULATION_OPEN_SIGNUP")
 PUBLIC_URL = _setting("REFORMULATION_PUBLIC_URL", "http://localhost:8501")
 
-st.set_page_config(page_title="Reformulation Assurance v0.12.0", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.12.1", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.12.0 · design → run → verify → qualify → approve → export")
+st.caption("v0.12.1 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
