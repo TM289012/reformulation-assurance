@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.12.3."""
+"""Streamlit application for Reformulation Assurance v0.12.4."""
 from __future__ import annotations
 
 import os
@@ -83,10 +83,10 @@ except ValueError as exc:  # a malformed value must not take the whole app down
     SMTP_SETTINGS = None
     SMTP_PROBLEM = str(exc)
 
-st.set_page_config(page_title="Reformulation Assurance v0.12.3", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.12.4", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.12.3 · design → run → verify → qualify → approve → export")
+st.caption("v0.12.4 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 

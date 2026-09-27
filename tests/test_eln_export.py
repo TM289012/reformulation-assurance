@@ -21,7 +21,7 @@ if str(ROOT) not in sys.path:
 
 from demo_seed import DEMO_OWNER_EMAIL, DEMO_OWNER_PASSWORD, seed_demo  # noqa: E402
 from dossier import evidence_snapshot_and_hash  # noqa: E402
-from eln_export import ELN_MEDIA_TYPE, RO_CRATE_CONFORMS_TO, RO_CRATE_CONTEXT, generate_eln  # noqa: E402
+from eln_export import ELN_SPEC_CONFORMS_TO, ELN_MEDIA_TYPE, RO_CRATE_CONFORMS_TO, RO_CRATE_CONTEXT, generate_eln  # noqa: E402
 from pilot_store import PilotStore  # noqa: E402
 
 
@@ -78,6 +78,18 @@ class ElnExportTests(unittest.TestCase):
         self.assertEqual(publisher["@type"], "Organization")
         root = nodes["./"]
         self.assertEqual(root["@type"], "Dataset")
+        # RO-Crate 1.2 with the ELN 1.2+202609 declaration: both profiles are referenced from the
+        # root and described as Profile entities; the root names a publisher and a licence.
+        self.assertEqual(RO_CRATE_CONFORMS_TO, "https://w3id.org/ro/crate/1.2")
+        self.assertEqual(metadata["@context"], "https://w3id.org/ro/crate/1.2/context")
+        self.assertEqual(root["conformsTo"], [{"@id": RO_CRATE_CONFORMS_TO}, {"@id": ELN_SPEC_CONFORMS_TO}])
+        for profile in root["conformsTo"]:
+            self.assertIn("Profile", nodes[profile["@id"]]["@type"])
+            self.assertTrue(nodes[profile["@id"]]["name"])
+        self.assertEqual(nodes[root["publisher"]["@id"]]["@type"], "Organization")
+        licence = nodes[root["license"]["@id"]]
+        self.assertEqual(licence["@type"], "CreativeWork")
+        self.assertTrue(licence["name"] and licence["description"])
         # Root hasPart is the import list (ELN format 1.2+202609): the experiment entry
         # first, then every attached file; importers that make one record per root
         # Dataset skip the File entries.
@@ -109,14 +121,27 @@ class ElnExportTests(unittest.TestCase):
         author = nodes[experiment["author"]["@id"]]
         self.assertEqual(author["@type"], "Person")
         self.assertTrue(author["givenName"] or author["familyName"] or author["name"])
-        # Every PropertyValue is inline (eLabFTW reads propertyID directly) and also a graph node.
-        inline = {value["propertyID"]: value for value in experiment["variableMeasured"]}
-        self.assertIn("elabftw_metadata", inline)
-        self.assertIn("scientific_evidence_sha256", inline)
-        self.assertEqual(inline["scientific_evidence_sha256"]["value"], self.evidence_hash)
-        for value in experiment["variableMeasured"]:
-            self.assertEqual(nodes[value["@id"]], value)
-        extra = json.loads(inline["elabftw_metadata"]["value"])
+        self.assertTrue(author["@id"].startswith("#"), "contextual entities use local identifiers")
+        self.assertEqual(nodes[author["affiliation"]["@id"]]["@type"], "Organization")
+        # Flattened graph: variableMeasured holds references only, the PropertyValue nodes are top level.
+        for reference in experiment["variableMeasured"]:
+            self.assertEqual(set(reference), {"@id"})
+        values = {nodes[ref["@id"]]["propertyID"]: nodes[ref["@id"]] for ref in experiment["variableMeasured"]}
+        self.assertIn("elabftw_metadata", values)
+        self.assertIn("scientific_evidence_sha256", values)
+        self.assertEqual(values["scientific_evidence_sha256"]["value"], self.evidence_hash)
+        # Nothing in the graph embeds another entity (RO-Crate 2.3): nested objects are bare references.
+        def nested(value):
+            if isinstance(value, dict):
+                self.assertEqual(set(value), {"@id"}, f"embedded object where a reference belongs: {value}")
+            elif isinstance(value, list):
+                for item in value:
+                    nested(item)
+        for node in metadata["@graph"]:
+            for key, value in node.items():
+                if key != "@id":
+                    nested(value)
+        extra = json.loads(values["elabftw_metadata"]["value"])
         self.assertIn("extra_fields", extra)
         self.assertEqual(extra["extra_fields"]["Scientific evidence SHA-256"]["value"], self.evidence_hash)
         self.assertEqual(extra["extra_fields"]["Dossier version"]["value"], str(manifest["dossier_version"]))

@@ -1,4 +1,4 @@
-"""ELN archive export (.eln, RO-Crate) for Reformulation Assurance v0.12.3.
+"""ELN archive export (.eln, RO-Crate) for Reformulation Assurance v0.12.4.
 
 An .eln file is a zipped RO-Crate: a single root folder holding a
 ``ro-crate-metadata.json`` that describes everything beside it. It is the
@@ -19,8 +19,12 @@ experiment, uses ``name`` as the title, ``text`` as the body, ``temporal``
 as the entry date, ``keywords`` as tags, resolves each ``File`` by its
 ``@id`` relative to the root folder, verifies ``sha256`` when asked to, and
 reads extra fields from a ``PropertyValue`` whose ``propertyID`` is
-``elabftw_metadata``. Everything the importer touches is written inline so
-no lookup can fail.
+``elabftw_metadata``. The crate is a flattened JSON-LD graph, as RO-Crate
+requires: ``variableMeasured`` holds references and the PropertyValue nodes
+sit at the top level. (eLabFTW's importer resolves such references only for
+crates that carry its own internal ``version`` marker on the root Dataset;
+for other crates it still imports the entry, the tags and every attachment,
+and the same values are in the entry body.)
 """
 from __future__ import annotations
 
@@ -40,17 +44,19 @@ from dossier import _canonical_json, _table_html, generate_dossier, generate_wor
 from product_store import ProductStore
 
 SOFTWARE_NAME = "Reformulation Assurance"
-SOFTWARE_VERSION = "0.12.3"
+SOFTWARE_VERSION = "0.12.4"
 SOFTWARE_URL = "https://github.com/TM289012/reformulation-assurance"
 ELN_MEDIA_TYPE = "application/vnd.eln+zip"
-# The ELN file format (1.2+202609) pins RO-Crate 1.2, but the consortium's own
-# validator still checks against the 1.1 profile, and every importer verified
-# against this exporter reads 1.1 crates. The crate stays on 1.1 until the
-# validator moves; everything else follows the 202609 wording (keywords as a
-# comma-separated string, every importable File listed in the root hasPart).
-RO_CRATE_CONTEXT = "https://w3id.org/ro/crate/1.1/context"
-RO_CRATE_CONFORMS_TO = "https://w3id.org/ro/crate/1.1"
+# The crate follows the ELN file format 1.2+202609 on RO-Crate 1.2: the metadata
+# descriptor declares the RO-Crate version, the root Dataset declares both the
+# RO-Crate profile and the ELN specification, and every referenced entity is a
+# separate node in the graph (RO-Crate requires a flattened JSON-LD document, and
+# the consortium's checks run only on crates that declare 1.2+202609).
+RO_CRATE_CONTEXT = "https://w3id.org/ro/crate/1.2/context"
+RO_CRATE_CONFORMS_TO = "https://w3id.org/ro/crate/1.2"
+ELN_SPEC_CONFORMS_TO = "https://purl.archive.org/purl/elnconsortium/eln-spec/1.2+202609"
 ELN_FORMAT_DESCRIPTOR_VERSION = "1.0"
+LICENSE_ID = "#license"
 
 _MEDIA_TYPES = {
     ".html": "text/html",
@@ -102,6 +108,18 @@ def _split_name(display_name: str) -> tuple[str, str]:
     if len(parts) == 1:
         return parts[0], ""
     return " ".join(parts[:-1]), parts[-1]
+
+
+def _workspace_name(store: ProductStore, user_id: str, organization_id: str) -> str:
+    """Name of the workspace that owns the project, for the publisher and affiliation nodes."""
+    try:
+        organizations = store.user_organizations(user_id)
+        match = organizations[organizations["id"] == organization_id] if organization_id else organizations
+        if not match.empty:
+            return str(match.iloc[0]["name"])
+    except Exception:  # a local install without organizations still exports
+        pass
+    return "Local workspace"
 
 
 def _describe(name: str) -> str:
@@ -275,7 +293,10 @@ def generate_eln(
     archive_name = f"{root_folder}.eln"
     experiment_folder = f"dossier-v{version}"
     experiment_id = f"./{experiment_folder}/"
-    author_id = f"./author/{user['id']}"
+    author_id = f"#author-{user['id']}"
+    organization_id = str(project.get("organization_id") or "")
+    workspace_id = f"#workspace-{organization_id or 'local'}"
+    workspace_name = _workspace_name(store, user["id"], organization_id)
     metadata_property_id = "#elabftw-metadata"
     evidence_property_id = "#scientific-evidence-sha256"
     version_property_id = "#dossier-version"
@@ -300,8 +321,8 @@ def generate_eln(
         generated_at=generated_at,
     )
 
-    # PropertyValue nodes are written inline under variableMeasured (what
-    # eLabFTW reads) and repeated as graph nodes (what RO-Crate tooling reads).
+    # PropertyValue nodes are top-level graph entities; the experiment entry
+    # references them from variableMeasured (flattened JSON-LD, RO-Crate rule 2.3).
     property_values = [
         {
             "@id": metadata_property_id,
@@ -349,6 +370,10 @@ def generate_eln(
         "@id": experiment_id,
         "@type": "Dataset",
         "name": f"{project['name']}: qualification dossier v{version}",
+        "description": (
+            f"Qualification dossier v{version} for '{project['name']}': gates, approvals, calibration "
+            f"and the evidence hash, with the evidence files attached."
+        ),
         "identifier": dossier_id,
         "genre": "experiment",
         "author": {"@id": author_id},
@@ -360,15 +385,50 @@ def generate_eln(
         "keywords": "reformulation assurance, qualification dossier, formulation",
         "url": SOFTWARE_URL,
         "hasPart": [{"@id": node["@id"]} for node in file_nodes],
-        "variableMeasured": property_values,
+        # References only: RO-Crate requires a flattened graph, so the PropertyValue
+        # nodes live at the top level and are pointed at from here.
+        "variableMeasured": [{"@id": node["@id"]} for node in property_values],
     }
-    organization_node = {
+    software_node = {
         "@id": SOFTWARE_URL,
         "@type": "Organization",
         "name": SOFTWARE_NAME,
+        "description": f"The open-source workbench that produced this archive (v{SOFTWARE_VERSION}).",
         "url": SOFTWARE_URL,
     }
-    person_node = {"@id": author_id, "@type": "Person", "name": generated_by}
+    workspace_node = {
+        "@id": workspace_id,
+        "@type": "Organization",
+        "name": workspace_name,
+        "description": "The workspace (laboratory, team or course section) that owns the evidence in this archive.",
+    }
+    license_node = {
+        "@id": LICENSE_ID,
+        "@type": "CreativeWork",
+        "name": "All rights reserved by the exporting workspace",
+        "description": (
+            "The evidence in this archive belongs to the workspace that exported it. No licence is granted "
+            "by the export itself; the owner may attach one when sharing the archive."
+        ),
+    }
+    profile_nodes = [
+        {
+            "@id": RO_CRATE_CONFORMS_TO,
+            "@type": ["CreativeWork", "Profile"],
+            "name": "RO-Crate 1.2 Specification",
+        },
+        {
+            "@id": ELN_SPEC_CONFORMS_TO,
+            "@type": ["CreativeWork", "Profile"],
+            "name": "ELN-File Format 1.2+202609 Specification",
+        },
+    ]
+    person_node = {
+        "@id": author_id,
+        "@type": "Person",
+        "name": generated_by,
+        "affiliation": {"@id": workspace_id},
+    }
     if given_name:
         person_node["givenName"] = given_name
     if family_name:
@@ -399,12 +459,18 @@ def generate_eln(
                 )
             ),
             "datePublished": generated_at,
+            "publisher": {"@id": workspace_id},
+            "license": {"@id": LICENSE_ID},
+            "conformsTo": [{"@id": RO_CRATE_CONFORMS_TO}, {"@id": ELN_SPEC_CONFORMS_TO}],
             # The root hasPart is the import list: the experiment entry first, then every
             # attached file, each of which the entry also lists (spec 1.2+202609). Importers
             # that create one record per root Dataset skip the File entries here.
             "hasPart": [{"@id": experiment_id}, *({"@id": node["@id"]} for node in file_nodes)],
         },
-        organization_node,
+        *profile_nodes,
+        software_node,
+        workspace_node,
+        license_node,
         person_node,
         experiment_node,
         *file_nodes,

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.12.4 (2026-09-27)
+
+- **`.eln` export on RO-Crate 1.2 with the ELN 1.2+202609 declaration.** The metadata descriptor declares RO-Crate 1.2, the root Dataset declares both the RO-Crate profile and the ELN specification (as `Profile` entities), and the crate is a fully flattened JSON-LD graph: `variableMeasured` now holds references and the `PropertyValue` nodes are top-level entities, which is what RO-Crate requires and what the ELN Consortium's updated checks enforce. The root also names the exporting workspace as `publisher` and carries a licence entity; the author has a local identifier and an `affiliation`. Checked against the consortium's new test suite (archive structure, metadata rules, schema, `rocrate` parse: all pass at version 1.2+202609).
+- Known consequence: eLabFTW's importer resolves `variableMeasured` references only for crates carrying eLabFTW's own internal `version` marker, so the extra-fields panel is not populated on import until that is fixed upstream (reported); the entry, tags, body and every attachment import as before, and the same values are in the body.
+
 ## v0.12.3 (2026-09-27)
 
 - **Mail failures are explained where the administrator looks.** The Team page's outbox now shows why a message failed in plain language next to its status (a rejected app password, a missing username, a wrong port, a blocked or unreachable host), lists how many messages failed since the last successful send, and offers a *Retry failed messages* button once the settings are fixed. Failed password resets are counted without exposing their recipients or links.
