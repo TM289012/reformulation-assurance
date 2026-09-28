@@ -103,7 +103,7 @@
       <summary>How this works (and what it can't tell you)</summary>
       <p>This is an XmR individuals chart, the classic process-behavior chart (Shewhart; see Donald Wheeler's books). The limits are <i>mean &plusmn; 2.66 &times; average moving range</i>, computed from your own data. They describe how much routine, point-to-point noise your measurements already contain.</p>
       <p>Two signals are checked: <b>any point outside the limits</b> (something changed abruptly), and <b>8 or more consecutive points on the same side of the mean</b> (something is slowly drifting). If neither fires, the honest reading is that your variation looks routine and chasing individual ups and downs will just chase noise.</p>
-      <p>Limits: it assumes your values are in time order and describe one thing that should be stable. It won't detect drift smaller than your noise floor with few points, and it doesn't model autocorrelation. Small samples have hard floors (per Wheeler): the first or last point cannot flag before 6 values, a middle point cannot flag before 8, and the limits only stabilize around 17 or more — so below those counts this page says so instead of pretending. A verdict here is a reason to look, not a root cause.</p>
+      <p>Limits: it assumes your values are in time order and describe one thing that should be stable. It won't detect drift smaller than your noise floor with few points, and it doesn't model autocorrelation. Small samples have hard floors, from the arithmetic of the limits themselves: the first or last point cannot flag before 5 values and a middle point cannot flag before 8; and, as Wheeler notes, the limits only begin to stabilize at about 17 values — so below those counts this page says so instead of pretending. It also applies Wheeler's chunky-data rule ("What is Chunky Data?", 2011): it reads the recording increment off your numbers (the finest decimal place you typed, or a coarser step every value shares, such as 50; that reading of the data is this page's own and errs toward the coarser step), and when only three or fewer possible moving-range values fit inside the range limits, round-off has deflated the limits, so the page draws a plain running record with no limits, refuses to call signals, and tells you to record one more digit instead. Four is Wheeler's borderline-safe minimum and is judged normally, with a note. A verdict here is a reason to look, not a root cause.</p>
     </details>
   </div>
 
@@ -116,18 +116,61 @@
 <script>
 "use strict";
 
+function gcd(a, b) {
+  while (b) { const t = a % b; a = b; b = t; }
+  return a;
+}
+
+function decimalsOf(token) {
+  // Decimal places a typed number uses, including scientific notation: "2.5e-3" uses 4,
+  // "1.25E4" uses -2 (a step of 100).
+  const m = /^[+-]?(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(token.trim());
+  if (!m) { return 0; }
+  const fraction = m[2] ? m[2].length : 0;
+  const exponent = m[3] ? parseInt(m[3], 10) : 0;
+  return Math.max(-12, Math.min(12, fraction - exponent));
+}
+
 function parseValues(text) {
   const tokens = String(text || "").split(/[\s,;]+/).filter(function (t) { return t.length > 0; });
   const values = [];
   let ignored = 0;
+  let decimals = null;
   tokens.forEach(function (t) {
     const v = Number(t);
-    if (Number.isFinite(v)) { values.push(v); } else { ignored += 1; }
+    if (Number.isFinite(v)) {
+      values.push(v);
+      const d = decimalsOf(t);
+      decimals = decimals === null ? d : Math.max(decimals, d);
+    } else { ignored += 1; }
   });
-  return { values: values, ignored: ignored };
+  if (decimals === null) { decimals = 0; }
+  // The recording increment, read off the data as Wheeler suggests ("by inspecting either the
+  // ranges or the original data"), erring toward the coarser step: the finest decimal place
+  // typed, then the largest step of 1 or 5 times a power of ten of that place that every value
+  // shares (dry times 35, 35, 40 give 5; viscosities 11250, 11300, 11200 give 50).
+  const scale = Math.pow(10, decimals);
+  let increment = decimals >= 0 ? 1 / scale : Math.pow(10, -decimals);
+  let common = 0;
+  let exact = true;
+  values.forEach(function (v) {
+    const units = Math.abs(Math.round(v * scale));
+    if (!Number.isSafeInteger(units)) { exact = false; }
+    common = gcd(common, units);
+  });
+  if (exact && common > 0) {
+    let step = 1;
+    for (let power = 1; 5 * power <= common; power *= 10) {
+      if (common % (5 * power) === 0) { step = 5 * power; }
+      if (common % (10 * power) === 0) { step = 10 * power; }
+    }
+    increment = decimals >= 0 ? step / scale : step * Math.pow(10, -decimals);
+  }
+  const wholeNumbers = values.length > 0 && increment >= 1 && values.every(function (v) { return Number.isInteger(v); });
+  return { values: values, ignored: ignored, increment: increment, wholeNumbers: wholeNumbers };
 }
 
-function analyze(values) {
+function analyze(values, increment) {
   const n = values.length;
   const mean = values.reduce(function (a, b) { return a + b; }, 0) / n;
   const movingRanges = [];
@@ -158,10 +201,20 @@ function analyze(values) {
     }
   }
 
+  // Chunky-data rule (Wheeler, "What is Chunky Data?", 2011): count the possible
+  // moving-range values inside the range chart's limits (0, 1, 2 ... increments up to
+  // the upper range limit 3.268 x average moving range). Three or fewer means the
+  // recording increment is too coarse and the limits are deflated by round-off; four
+  // is borderline.
+  const upperRangeLimit = 3.268 * mrBar;
+  const possibleRangeValues = increment > 0 ? Math.floor(upperRangeLimit / increment + 1e-9) + 1 : 0;
+
   return {
     n: n, mean: mean, mrBar: mrBar, upper: upper, lower: lower,
     outside: outside, runs: runs, runPoints: runPoints,
-    detectable: 2.66 * mrBar
+    detectable: 2.66 * mrBar,
+    increment: increment, possibleRangeValues: possibleRangeValues,
+    chunky: possibleRangeValues <= 3, borderline: possibleRangeValues === 4
   };
 }
 
@@ -172,20 +225,22 @@ function fmt(x) {
   return x.toFixed(digits);
 }
 
-function drawChart(values, result) {
+function drawChart(values, result, withLimits) {
   const svg = document.getElementById("chart");
   const W = 760, H = 300, padL = 62, padR = 16, padT = 18, padB = 34;
   const innerW = W - padL - padR, innerH = H - padT - padB;
-  const lo = Math.min(result.lower, Math.min.apply(null, values));
-  const hi = Math.max(result.upper, Math.max.apply(null, values));
+  const lo = withLimits ? Math.min(result.lower, Math.min.apply(null, values)) : Math.min.apply(null, values);
+  const hi = withLimits ? Math.max(result.upper, Math.max.apply(null, values)) : Math.max.apply(null, values);
   const span = (hi - lo) || 1;
   const y = function (v) { return padT + innerH * (1 - (v - lo + span * 0.06) / (span * 1.12)); };
   const x = function (i) {
     return values.length === 1 ? padL + innerW / 2 : padL + innerW * (i / (values.length - 1));
   };
   const flagged = {}; // 2 = outside limits (red), 1 = part of a run (amber)
-  result.runPoints.forEach(function (i) { flagged[i] = 1; });
-  result.outside.forEach(function (i) { flagged[i] = 2; });
+  if (withLimits) {
+    result.runPoints.forEach(function (i) { flagged[i] = 1; });
+    result.outside.forEach(function (i) { flagged[i] = 2; });
+  }
 
   let s = "";
   const hline = function (v, color, dash, label) {
@@ -193,9 +248,11 @@ function drawChart(values, result) {
          '" stroke="' + color + '" stroke-width="1.4" stroke-dasharray="' + dash + '"/>';
     s += '<text x="' + (padL - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end" font-size="11" fill="' + color + '">' + label + '</text>';
   };
-  hline(result.upper, "#b91c1c", "5 4", fmt(result.upper));
-  hline(result.mean, "#6b7280", "2 3", fmt(result.mean));
-  hline(result.lower, "#b91c1c", "5 4", fmt(result.lower));
+  if (withLimits) {
+    hline(result.upper, "#b91c1c", "5 4", fmt(result.upper));
+    hline(result.mean, "#6b7280", "2 3", fmt(result.mean));
+    hline(result.lower, "#b91c1c", "5 4", fmt(result.lower));
+  }
 
   let path = "";
   values.forEach(function (v, i) { path += (i ? "L" : "M") + x(i) + " " + y(v) + " "; });
@@ -225,22 +282,39 @@ function render() {
     return;
   }
 
-  const result = analyze(values);
-  drawChart(values, result);
+  const result = analyze(values, parsed.increment);
+  // Chunky data: a running record only. Limits computed from them would be deflated by round-off.
+  drawChart(values, result, !result.chunky);
   chartwrap.style.display = "block";
 
   const notes = [];
   if (parsed.ignored) { notes.push(parsed.ignored + " non-numeric entr" + (parsed.ignored === 1 ? "y was" : "ies were") + " ignored."); }
   const provisional = result.n < 8;
-  if (result.n >= 6 && provisional) { notes.push("At " + result.n + " points only the first and last value could flag; middle points need 8+."); }
+  if (result.n >= 5 && provisional) { notes.push("At " + result.n + " points only the first and last value could flag; middle points need 8+."); }
   if (result.n >= 8 && result.n < 17) { notes.push("Limits keep firming up until about 17 points; treat them as approximate at n=" + result.n + "."); }
 
-  if (result.mrBar === 0) {
+  if (result.chunky) {
     verdict.className = "warn";
-    verdict.innerHTML = "<h2>Every value is identical</h2><p>There is no point-to-point variation at all, so limits can't be computed. Real measurements always vary; check the resolution of what you pasted.</p>";
-    document.getElementById("stats").innerHTML = "";
+    verdict.innerHTML = "<h2>Chunky data: the measurement increment is too coarse</h2>" +
+      "<p>" + (result.mrBar === 0
+        ? "Every value is identical, so there is no point-to-point variation for the chart to work with."
+        : "At this recording step (" + fmt(result.increment) + "), consecutive readings mostly repeat or move by a single step, " +
+          "so the moving ranges can take only " + result.possibleRangeValues + " possible value" + (result.possibleRangeValues === 1 ? "" : "s") +
+          " inside their limits; Wheeler's rule for moving ranges needs at least four.") +
+      " Round-off deflates the average moving range, and with it the natural limits, which then throw false alarms, so no verdict is given.</p>" +
+      "<p>The fix is to record one more digit, even if it seems uncertain (a meter that reads 5.42 should be logged as 5.42, not 5.4), or to space the readings out so that real variation shows between them. If the instrument cannot give another digit, you may need a different measurement system. A running record of these values is still fine to look at; limits computed from them are not.</p>" +
+      (parsed.wholeNumbers
+        ? "<p>If these are counts, there is no extra digit to record: counts this chunky can be shown as a running record but will not support limits at all (Wheeler calls them irredeemably chunky).</p>"
+        : "") +
+      (notes.length ? "<p>" + notes.join(" ") + "</p>" : "");
+    document.getElementById("stats").innerHTML =
+      "<span>n <b>" + result.n + "</b></span>" +
+      "<span>recording increment <b>" + fmt(result.increment) + "</b></span>" +
+      "<span>avg moving range <b>" + fmt(result.mrBar) + "</b></span>" +
+      "<span>possible range values within limits <b>" + result.possibleRangeValues + "</b> (need 4+)</span>";
     return;
   }
+  if (result.borderline) { notes.push("Borderline measurement increment: only four possible moving-range values fit inside the range limits, the minimum Wheeler's chunky-data rule allows. One more recorded digit would make the limits firmer."); }
 
   const signals = [];
   if (result.outside.length) {
@@ -264,10 +338,10 @@ function render() {
       signals.map(function (t) { return "<p>" + t + "</p>"; }).join("") +
       "<p>Worth investigating before trusting comparisons against this baseline." +
       (notes.length ? " " + notes.join(" ") : "") + "</p>";
-  } else if (result.n < 6) {
+  } else if (result.n < 5) {
     verdict.className = "warn";
     verdict.innerHTML = "<h2>Too few points for this chart to say anything</h2>" +
-      "<p>With " + result.n + " values, XmR limits cannot flag the first or last point until you have 6, or a middle point until 8. A quiet chart here is not evidence of stability — it's just not enough data yet. Paste more history if you have it, or collect more before trusting this baseline." +
+      "<p>With " + result.n + " values, XmR limits cannot flag the first or last point until you have 5, or a middle point until 8. A quiet chart here is not evidence of stability — it's just not enough data yet. Paste more history if you have it, or collect more before trusting this baseline." +
       (notes.length ? " " + notes.join(" ") : "") + "</p>";
   } else {
     verdict.className = provisional ? "warn" : "good";

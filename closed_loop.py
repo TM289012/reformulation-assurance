@@ -231,13 +231,17 @@ def qualification_progress(store: ProjectStore, project_id: str) -> dict[str, An
             for _, group in stage_groups.iterrows():
                 if int(group.get("completed_replicates", 0)) < min_replicates:
                     continue
-                # Stage 1 (Wheeler screen): every judged response must have
-                # replicates consistent with each other before the CV means
-                # anything. A group with an inconsistent replicate cannot pass.
+                # Stage 1 (Wheeler's consistency screen, XmR limits from the other replicates):
+                # every judged response must have replicates consistent with each
+                # other before the CV means anything. Where the siblings are chunky
+                # the limits are widened for round-off, so a flag from widened limits
+                # is never a round-off false alarm; plain limits (siblings with four
+                # or more possible values, Wheeler's borderline-safe condition) can
+                # still flag at the edge, which errs toward blocking.
                 screen_ok = True
                 for response in cv_limits:
                     consistent = group.get(f"consistent_{response}")
-                    if consistent is False:
+                    if not pd.isna(consistent) and not bool(consistent):
                         screen_ok = False
                         note = str(group.get(f"screen_note_{response}", "")).strip()
                         screened_out.append(
@@ -246,23 +250,38 @@ def qualification_progress(store: ProjectStore, project_id: str) -> dict[str, An
                         break
                 if not screen_ok:
                     continue
-                # Stage 2: the CV check, now on replicates that agree.
+                # Stage 2: the CV check, on the largest CV the readings allow at their
+                # recording step (cv_upper), a safeguard this tool adds: round-off can
+                # hide part of the spread, and badly so for chunky data (Wheeler's
+                # rule), so a group passes only if even the widest spread the
+                # round-off could hide keeps the CV within the limit. For finely
+                # recorded data the bound is barely above the CV itself.
                 cv_ok = True
                 for response, limit in cv_limits.items():
-                    cv = group.get(f"cv_{response}")
-                    if cv is None or pd.isna(cv) or float(cv) > float(limit):
+                    bound = group.get(f"cv_upper_{response}")
+                    if bound is None or pd.isna(bound):
+                        bound = group.get(f"cv_{response}")
+                    if bound is None or pd.isna(bound) or float(bound) > float(limit):
                         cv_ok = False
+                        cv = group.get(f"cv_{response}")
+                        if cv is not None and not pd.isna(cv) and float(cv) <= float(limit):
+                            shown = f"{float(bound):.1%}" if bound is not None and not pd.isna(bound) and np.isfinite(float(bound)) else "unbounded"
+                            screened_out.append(
+                                f"group '{group.get('replicate_group')}' ({response}: the CV of {float(cv):.1%} is within the "
+                                f"{float(limit):.0%} limit, but at this recording step the readings allow a CV of up to {shown}; "
+                                f"record one more digit if the instrument or scale allows one, or check the recording step)"
+                            )
                         break
                 if cv_ok:
                     passing_groups += 1
             components.append(_ratio_progress(passing_groups, required_groups))
             if passing_groups < required_groups:
                 reasons.append(
-                    f"Needs {required_groups - passing_groups} replicate group(s) with at least {min_replicates} runs, consistent replicates, and acceptable CV"
+                    f"Needs {required_groups - passing_groups} replicate group(s) with at least {min_replicates} runs, consistent replicates, and an acceptable CV (for chunky data, the largest CV the readings allow)"
                 )
                 if screened_out:
                     reasons.append(
-                        "Replicate screen (per Wheeler): " + "; ".join(screened_out[:3])
+                        "Replicate checks: " + "; ".join(screened_out[:3])
                         + (" …" if len(screened_out) > 3 else "")
                     )
 

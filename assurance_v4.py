@@ -227,51 +227,218 @@ def result_for_storage(result: Mapping[str, Any]) -> dict[str, Any]:
     return stored
 
 
-def wheeler_screen_detail(values: list[float]) -> dict[str, Any]:
-    """Leave-one-out consistency screen for a replicate group, with its reasons.
+MOVING_RANGE_UPPER_FACTOR = 3.268  # D4 for n = 2: upper limit of a moving-range chart
+MAX_DECIMALS = 12
 
-    Follows Donald Wheeler's procedure for small replicate sets: judge each
-    value against natural limits (mean ± 2.66 × average moving range) computed
-    from the OTHER values in run order. Returns a dict with:
-    - ``consistent``: None when there are fewer than 3 values (nothing to
-      screen); False when some value falls outside the limits built from its
-      siblings; True otherwise.
-    - ``flagged``: the index of the first inconsistent value, else None.
-    - ``unjudged``: indices whose siblings were all identical. Identical
-      readings do not prove zero variation, they show variation below the
-      instrument's resolution (a pH meter reading 5.4 twice), so the limits
-      built from them have no width and cannot judge anything. Those values
-      are left to the CV check rather than flagged.
 
-    With 3-6 values the screen is indicative, not definitive — the limits are
-    soft at these counts, which is exactly why it screens instead of verdicts.
+def _decimal_places(value: float) -> int:
+    """Decimal places a stored reading uses (5.35 gives 2, 11250.0 gives 0). The
+    tolerance is a few units in the last place, so tiny readings such as 2.5e-10
+    keep their decimals and large ones such as 123456789.123 are not read as whole."""
+    v = float(value)
+    if v == 0 or not math.isfinite(v):
+        return 0
+    tolerance = 4 * math.ulp(v)
+    for d in range(0, MAX_DECIMALS + 1):
+        if abs(round(v, d) - v) <= tolerance:
+            return d
+    return MAX_DECIMALS
+
+
+def measurement_increment(values: list[float]) -> float:
+    """The recording increment of a set of readings, read off the data (Wheeler's
+    first step is to determine the measurement increment used, "by inspecting either
+    the ranges or the original data"). When the lab knows its recording step it
+    should say so instead: a declared step always wins (see ``recording_steps`` in
+    the project configuration), because reading it off a few numbers can go wrong.
+
+    How it is read, erring toward the coarser step (fail-safe for the chunky call and
+    for :func:`cv_upper_bound`, both of which it makes stricter, though it makes the
+    widened consistency screen more lenient): take the
+    finest decimal place any reading uses (5.4 and 5.35 give 0.01; whole numbers give
+    1), then the largest step of one or five times a power of ten of that place that
+    every reading is a multiple of. Dry times logged as 35, 35, 40 give 5 and
+    viscosities 11250, 11400, 12800 give 50; readings that happen to share such a
+    step by chance are read coarser than they were, which the declared step fixes.
+
+    What cannot be seen: stored numbers drop trailing zeros (pH 7.00 reads as 7.0, a
+    step of 1, far coarser than 0.01); steps of 2 or 25 are read as 1 or 5; and
+    readings converted between units or computed from others carry long decimals,
+    so their step looks far finer than it was.
     """
-    n = len(values)
+    readings = [float(v) for v in values if math.isfinite(float(v))]
+    if not readings:
+        return 1.0
+    decimals = max(_decimal_places(v) for v in readings)
+    scale = 10 ** decimals
+    if decimals >= MAX_DECIMALS or max(abs(v) for v in readings) * scale >= 2 ** 53:
+        return 10.0 ** (-decimals)
+    common = 0
+    for v in readings:
+        common = math.gcd(common, abs(int(round(v * scale))))
+    step = 1
+    power = 1
+    while common and 5 * power <= common:
+        if common % (5 * power) == 0:
+            step = 5 * power
+        if common % (10 * power) == 0:
+            step = 10 * power
+        power *= 10
+    return step / scale
+
+
+def possible_range_values(upper_range_limit: float, increment: float) -> int:
+    """Possible range values within the limits of a range chart with no lower limit:
+    0, one increment, two increments, ... up to the upper range limit, zero counted
+    (Wheeler's Figure 3: a limit of .01810 at .001 gives 19; Figure 4: .0102 at .01
+    gives 2; Table 3, n = 2: a limit of 3.69 increments gives 4)."""
+    return int(upper_range_limit / increment + 1e-9) + 1 if increment > 0 else 0
+
+
+def chunky_data_check(values: list[float], increment: float | None = None) -> dict[str, Any]:
+    """Wheeler's chunky-data test for a moving-range chart (subgroup size 2).
+
+    The data are chunky when the measurement increment is too large to show
+    the routine variation: count the possible range values inside the range
+    chart's limits (0, one increment, two increments, ... up to the upper
+    range limit 3.268 x average moving range). For moving ranges, three or
+    fewer possible values mean chunky data (the many zero ranges deflate the
+    average range and so the limits, which then produce false alarms); four
+    is the borderline-safe condition. (Wheeler's general rule for subgroups
+    of three or more, four or fewer, does not apply to moving ranges.)
+    Reference: D. J. Wheeler, "What is Chunky Data?", Quality Digest, Dec 2011.
+    """
+    ordered = [float(v) for v in values]
+    increment = float(increment) if increment else measurement_increment(ordered)
+    moving_ranges = [abs(ordered[j] - ordered[j - 1]) for j in range(1, len(ordered))]
+    mr_bar = sum(moving_ranges) / len(moving_ranges) if moving_ranges else 0.0
+    upper_range_limit = MOVING_RANGE_UPPER_FACTOR * mr_bar
+    possible = possible_range_values(upper_range_limit, increment)
+    return {
+        "increment": increment,
+        "average_moving_range": mr_bar,
+        "upper_range_limit": upper_range_limit,
+        "possible_values": possible,
+        "chunky": possible <= 3,
+        "borderline": possible == 4,
+    }
+
+
+def cv_upper_bound(values: list[float], increment: float) -> float:
+    """The largest CV the true values behind these readings could have, if each
+    reading is its true value rounded or truncated to the recording increment.
+
+    This is the tool's own safeguard for chunky data, not a formula from Wheeler:
+    it does not estimate the CV from readings the round-off has distorted, it
+    bounds it. Each true value lies within one increment-wide interval of its
+    reading, so by the triangle inequality the sample standard deviation of the
+    true values is at most s + (increment / 2) x sqrt(n / (n - 1)), and their mean
+    is at least |mean| - increment. Returns inf when the mean is within one
+    increment of zero (no bound is possible) and NaN below two readings. The bound
+    is only as good as the recording step it is given: exact for a correctly
+    declared step, and conservative when the step read off the data errs coarse.
+    """
+    readings = [float(v) for v in values]
+    n = len(readings)
+    if n < 2:
+        return math.nan
+    mean = sum(readings) / n
+    sd = math.sqrt(sum((v - mean) ** 2 for v in readings) / (n - 1))
+    sd_max = sd + (float(increment) / 2.0) * math.sqrt(n / (n - 1))
+    floor = abs(mean) - float(increment)
+    return sd_max / floor if floor > 0 else math.inf
+
+
+def wheeler_screen_detail(values: list[float], increment: float | None = None) -> dict[str, Any]:
+    """Chunky-data check and leave-one-out consistency screen for one replicate group.
+
+    ``increment`` is the recording step; when it is not given it is read off the
+    readings with :func:`measurement_increment`.
+
+    1. Chunky data, after Donald Wheeler ("What is Chunky Data?", 2011). His rule is
+       applied to the group's own moving-range chart: readings in run order, limits
+       computed in the usual way from all of them. Three or fewer possible range
+       values within the limits means the recording step hides the routine
+       variation. Round-off then biases estimates of spread (Wheeler shows a standard
+       deviation first inflating, then collapsing toward zero, which carries over to
+       a CV), so the gates judge a chunky group on :func:`cv_upper_bound` instead of
+       its CV. A finer recording step is the real fix; more replicates will not
+       reliably fix it.
+    2. Consistency screen, Wheeler's procedure for small replicate sets (from his
+       email to the author): judge a value that looks out of line against XmR natural
+       limits (mean +/- 2.66 x average moving range) computed from the OTHER values in
+       run order. Outside, the formulation is not yet reproducible; inside, it is
+       probably reproducible and the CV may quantify its repeatability. The tool tests
+       every value this way, which in practice flags the odd one, because an odd
+       value widens the limits of every test it is part of. Where those siblings
+       are themselves chunky (two identical
+       readings, say), limits built from them would be deflated by round-off and give
+       false alarms, which is Wheeler's objection to chunky data, so they are widened
+       by the most the round-off could hide: every true moving range is within one
+       step of the recorded one, and the tested value and the centre together within
+       one step. A value outside even the widened limits is inconsistent however the
+       readings were rounded. The widening is this tool's own safeguard, not
+       Wheeler's; indices judged that way are listed in ``widened``. It applies inside
+       chunky groups too, so a wild value among identical readings is still caught.
+       Siblings with four or more possible values get plain limits, which Wheeler
+       calls borderline safe.
+
+    Returns a dict with ``consistent`` (None when there are fewer than 3 readings;
+    False when some value falls outside the limits built from its siblings; True
+    otherwise), ``flagged`` (index of the first inconsistent value, else None),
+    ``widened``, ``chunky``, ``possible_values`` (possible range values within the
+    limits of the group's own moving-range chart, None below two readings) and
+    ``increment`` (the recording step used).
+
+    With 3-6 readings everything here is indicative, not definitive: the count of
+    possible values and the limits are both rough at these sizes, and both depend on
+    the run order of the readings.
+    """
+    ordered = [float(v) for v in values if math.isfinite(float(v))]
+    n = len(ordered)
+    step = float(increment) if increment and float(increment) > 0 else (measurement_increment(ordered) if n else 1.0)
+    group = chunky_data_check(ordered, step) if n >= 2 else None
+    base: dict[str, Any] = {
+        "increment": step,
+        "possible_values": group["possible_values"] if group else None,
+        "chunky": bool(group and group["chunky"]),
+    }
     if n < 3:
-        return {"consistent": None, "flagged": None, "unjudged": []}
-    unjudged: list[int] = []
+        return {**base, "consistent": None, "flagged": None, "widened": []}
+    widened: list[int] = []
     for i in range(n):
-        others = values[:i] + values[i + 1 :]
-        moving_ranges = [abs(others[j] - others[j - 1]) for j in range(1, len(others))]
-        if not moving_ranges:
-            continue
+        others = ordered[:i] + ordered[i + 1 :]
+        check = chunky_data_check(others, step)
         center = sum(others) / len(others)
-        mr_bar = sum(moving_ranges) / len(moving_ranges)
-        if mr_bar == 0.0:
-            if abs(values[i] - center) > 1e-12:
-                unjudged.append(i)
-            continue
-        upper = center + 2.66 * mr_bar
-        lower = center - 2.66 * mr_bar
-        if values[i] > upper or values[i] < lower:
-            return {"consistent": False, "flagged": i, "unjudged": unjudged}
-    return {"consistent": True, "flagged": None, "unjudged": unjudged}
+        mr_bar = check["average_moving_range"]
+        if check["chunky"]:
+            widened.append(i)
+            half_width = 2.66 * (mr_bar + step) + step
+        else:
+            half_width = 2.66 * mr_bar
+        if abs(ordered[i] - center) > half_width:
+            return {**base, "consistent": False, "flagged": i, "widened": widened}
+    return {**base, "consistent": True, "flagged": None, "widened": widened}
 
 
 def wheeler_screen(values: list[float]) -> tuple[bool | None, int | None]:
-    """``(consistent, flagged_index)`` view of :func:`wheeler_screen_detail`."""
+    """``(consistent, flagged_index)`` view of :func:`wheeler_screen_detail`.
+    ``consistent`` is None when there are fewer than 3 values."""
     detail = wheeler_screen_detail(values)
     return detail["consistent"], detail["flagged"]
+
+
+def declared_recording_steps(config: Mapping[str, Any]) -> dict[str, float]:
+    """Recording steps the project declares per response (positive numbers only)."""
+    steps: dict[str, float] = {}
+    for response, value in (config.get("recording_steps") or {}).items():
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(number) and number > 0:
+            steps[str(response)] = number
+    return steps
 
 
 def replicate_summary(
@@ -279,7 +446,9 @@ def replicate_summary(
     project_id: str,
 ) -> pd.DataFrame:
     project = store.get_project(project_id)
-    responses = [item["response"] for item in project["config"]["response_specs"]]
+    config = project["config"]
+    responses = [item["response"] for item in config["response_specs"]]
+    declared_steps = declared_recording_steps(config)
     experiments = store.list_experiments(project_id, source_type="recommended")
     if experiments.empty:
         return pd.DataFrame()
@@ -288,6 +457,9 @@ def replicate_summary(
         return pd.DataFrame()
     records: list[dict[str, Any]] = []
     for (stage, group), frame in completed.groupby(["qualification_stage", "replicate_group"], dropna=False):
+        if "replicate_index" in frame.columns:
+            # Run order for the moving ranges: R1, R2, ... R10 (not the text order R1, R10, R2).
+            frame = frame.sort_values("replicate_index", kind="stable")
         record: dict[str, Any] = {
             "qualification_stage": stage,
             "replicate_group": group,
@@ -295,33 +467,67 @@ def replicate_summary(
         }
         for response in responses:
             values = pd.to_numeric(frame.get(response), errors="coerce").dropna()
+            values = values[np.isfinite(values.astype(float))]
             if values.empty:
                 record[f"mean_{response}"] = np.nan
                 record[f"cv_{response}"] = np.nan
+                record[f"cv_upper_{response}"] = np.nan
                 record[f"consistent_{response}"] = None
+                record[f"chunky_{response}"] = False
                 record[f"screen_note_{response}"] = ""
+                continue
+            readings = [float(v) for v in values.tolist()]
+            if "replicate_index" in frame.columns:
+                labels = [int(x) if pd.notna(x) else i + 1 for i, x in enumerate(frame.loc[values.index, "replicate_index"].tolist())]
             else:
-                mean = float(values.mean())
-                std = float(values.std(ddof=1)) if len(values) > 1 else 0.0
-                record[f"mean_{response}"] = mean
-                record[f"cv_{response}"] = abs(std / mean) if abs(mean) > 1e-12 else np.nan
-                detail = wheeler_screen_detail([float(v) for v in values.tolist()])
-                consistent, flagged, unjudged = detail["consistent"], detail["flagged"], detail["unjudged"]
-                record[f"consistent_{response}"] = consistent
-                if consistent is None:
-                    record[f"screen_note_{response}"] = "needs 3+ replicates to screen"
-                elif consistent is False:
-                    record[f"screen_note_{response}"] = (
-                        f"replicate #{(flagged or 0) + 1} inconsistent with the others"
-                    )
-                elif unjudged:
-                    which = ", ".join(f"#{index + 1}" for index in unjudged)
-                    record[f"screen_note_{response}"] = (
-                        f"replicates consistent; the others read identically so the screen could not "
-                        f"judge replicate {which} (below instrument resolution), the CV check applies"
-                    )
-                else:
-                    record[f"screen_note_{response}"] = "replicates consistent"
+                labels = list(range(1, len(readings) + 1))
+            mean = float(values.mean())
+            std = float(values.std(ddof=1)) if len(values) > 1 else 0.0
+            cv = abs(std / mean) if abs(mean) > 1e-12 else np.nan
+            record[f"mean_{response}"] = mean
+            record[f"cv_{response}"] = cv
+            declared = declared_steps.get(response)
+            detail = wheeler_screen_detail(readings, increment=declared)
+            consistent, flagged, widened = detail["consistent"], detail["flagged"], detail["widened"]
+            step = detail["increment"]
+            source = "set for this project" if declared else "read off the readings; set it under Recording steps if that is wrong"
+            record[f"consistent_{response}"] = consistent
+            record[f"chunky_{response}"] = bool(detail["chunky"])
+            record[f"cv_upper_{response}"] = cv_upper_bound(readings, step)
+            parts: list[str] = []
+            if consistent is None:
+                parts.append("needs 3+ replicates to screen")
+            elif consistent is False:
+                index = flagged or 0
+                parts.append(
+                    f"replicate #{labels[index]} inconsistent with the others"
+                    + (", even with limits widened for round-off" if index in widened else "")
+                )
+            elif widened:
+                which = ", ".join(f"#{labels[index]}" for index in widened)
+                parts.append(
+                    f"replicates consistent ({which} judged against limits widened for round-off, because the "
+                    f"readings around {'it' if len(widened) == 1 else 'them'} are too alike at this recording step)"
+                )
+            else:
+                parts.append("replicates consistent")
+            if detail["chunky"]:
+                possible = int(detail["possible_values"] or 0)
+                bound = record[f"cv_upper_{response}"]
+                bound_text = f"{bound:.2%}" if math.isfinite(bound) else "unbounded (the mean is within one step of zero)"
+                cv_text = f"{cv:.2%}" if not pd.isna(cv) else "undefined"
+                whole = step >= 1 and all(float(v).is_integer() for v in readings)
+                parts.append(
+                    f"chunky data (Wheeler's rule): at a recording step of {step:g} only {possible} possible "
+                    f"moving-range value{'' if possible == 1 else 's'} {'fits' if possible == 1 else 'fit'} within the "
+                    f"limits and four are needed, so the CV of {cv_text} is not taken at face value and gates use the "
+                    f"largest CV these readings allow, {bound_text}; record one more digit to measure repeatability "
+                    f"properly (more replicates will not reliably fix it)"
+                    + ("; counts and whole-number scores cannot take another digit" if whole else "")
+                )
+            if detail["chunky"] or widened:
+                parts.append(f"recording step {step:g}, {source}")
+            record[f"screen_note_{response}"] = ". ".join(parts)
         records.append(record)
     return pd.DataFrame(records)
 

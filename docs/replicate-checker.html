@@ -115,6 +115,7 @@
       <p>The check compares the difference between the two group means against the noise implied by your own replicates: the standard error of the difference, computed from each group's spread and count (the same quantity a Welch t-test uses). The verdict uses a deliberately conservative bar for small samples: a difference more than ~3 standard errors is called likely real, 2&ndash;3 is called suggestive, under 2 is called indistinguishable from noise.</p>
       <p>It also answers the more useful planning questions: the smallest difference your current noise and replicate count could reliably show, and roughly how many replicates per formula you would need to settle the difference you actually observed.</p>
       <p>Limits: this is a screen, not a proof. It assumes independent runs measured the same way, and spread estimated from 3&ndash;4 replicates is rough. It says nothing about whether the difference matters practically &mdash; that's your spec's job. And if your measurements were taken over days or weeks, check your baseline for drift first with the <a href="drift-checker.html">Baseline Drift Checker</a>, because drift masquerades as a formula difference.</p>
+      <p>Recording increment: each formula's replicates are also checked with Donald Wheeler's chunky-data rule ("What is Chunky Data?", 2011), at the recording step read off that formula's numbers (the finest decimal place typed, or a coarser step every value shares, which is this page's own reading of the data), using moving ranges between replicates in the order you paste them, so paste them in the order they were run. When a formula's replicates mostly repeat at that step (three or fewer possible moving-range values within the limits), round-off biases the noise estimate and the page declines to judge; record one more digit or use an instrument that reads finer. More replicates do not reliably fix chunky data. With only a few replicates this count is itself rough, so treat a borderline call as a prompt to check your recording step rather than a verdict.</p>
     </details>
   </div>
 
@@ -127,15 +128,73 @@
 <script>
 "use strict";
 
+function gcd(a, b) {
+  while (b) { const t = a % b; a = b; b = t; }
+  return a;
+}
+
+function decimalsOf(token) {
+  // Decimal places a typed number uses, including scientific notation: "2.5e-3" uses 4,
+  // "1.25E4" uses -2 (a step of 100).
+  const m = /^[+-]?(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(token.trim());
+  if (!m) { return 0; }
+  const fraction = m[2] ? m[2].length : 0;
+  const exponent = m[3] ? parseInt(m[3], 10) : 0;
+  return Math.max(-12, Math.min(12, fraction - exponent));
+}
+
 function parseValues(text) {
   const tokens = String(text || "").split(/[\s,;]+/).filter(function (t) { return t.length > 0; });
   const values = [];
   let ignored = 0;
+  let decimals = null;
   tokens.forEach(function (t) {
     const v = Number(t);
-    if (Number.isFinite(v)) { values.push(v); } else { ignored += 1; }
+    if (Number.isFinite(v)) {
+      values.push(v);
+      const d = decimalsOf(t);
+      decimals = decimals === null ? d : Math.max(decimals, d);
+    } else { ignored += 1; }
   });
-  return { values: values, ignored: ignored };
+  if (decimals === null) { decimals = 0; }
+  // The recording increment, read off the data as Wheeler suggests ("by inspecting either the
+  // ranges or the original data"), erring toward the coarser step: the finest decimal place
+  // typed, then the largest step of 1 or 5 times a power of ten of that place that every value
+  // shares (dry times 35, 35, 40 give 5; viscosities 11250, 11300, 11200 give 50).
+  const scale = Math.pow(10, decimals);
+  let increment = decimals >= 0 ? 1 / scale : Math.pow(10, -decimals);
+  let common = 0;
+  let exact = true;
+  values.forEach(function (v) {
+    const units = Math.abs(Math.round(v * scale));
+    if (!Number.isSafeInteger(units)) { exact = false; }
+    common = gcd(common, units);
+  });
+  if (exact && common > 0) {
+    let step = 1;
+    for (let power = 1; 5 * power <= common; power *= 10) {
+      if (common % (5 * power) === 0) { step = 5 * power; }
+      if (common % (10 * power) === 0) { step = 10 * power; }
+    }
+    increment = decimals >= 0 ? step / scale : step * Math.pow(10, -decimals);
+  }
+  const wholeNumbers = values.length > 0 && increment >= 1 && values.every(function (v) { return Number.isInteger(v); });
+  return { values: values, ignored: ignored, increment: increment, wholeNumbers: wholeNumbers };
+}
+
+// Wheeler's chunky-data rule ("What is Chunky Data?", 2011) for the moving-range chart of
+// one group's replicates, at that group's own recording step: fewer than four possible
+// range values inside the range limits means the recording increment hides the routine
+// variation, and round-off distorts every spread estimate built from those readings (a
+// standard deviation first inflates, then collapses toward zero, and hides the problem
+// instead of showing it). More replicates do not reliably fix it; a finer increment does.
+function chunky(values, increment) {
+  if (values.length < 2 || !(increment > 0)) { return null; }
+  let sum = 0;
+  for (let i = 1; i < values.length; i++) { sum += Math.abs(values[i] - values[i - 1]); }
+  const mrBar = sum / (values.length - 1);
+  const possible = Math.floor((3.268 * mrBar) / increment + 1e-9) + 1;
+  return { possible: possible, chunky: possible <= 3 };
 }
 
 function groupStats(values) {
@@ -219,12 +278,35 @@ function render() {
   }
 
   const r = compare(pa.values, pb.values);
+  // Written first, so every verdict below (including the chunky one) shows this run's numbers.
+  document.getElementById("stats").innerHTML =
+    "<span>A: mean <b>" + fmt(r.A.mean) + "</b> · sd <b>" + fmt(r.A.sd) + "</b> · n <b>" + r.A.n + "</b></span>" +
+    "<span>B: mean <b>" + fmt(r.B.mean) + "</b> · sd <b>" + fmt(r.B.sd) + "</b> · n <b>" + r.B.n + "</b></span>" +
+    "<span>difference <b>" + fmt(r.delta) + "</b></span>" +
+    "<span>standard error <b>" + fmt(r.se) + "</b></span>";
   drawChart(pa.values, pb.values, r);
   chartwrap.style.display = "block";
 
   const notes = [];
   if (ignored) { notes.push(ignored + " non-numeric entr" + (ignored === 1 ? "y was" : "ies were") + " ignored."); }
   if (r.A.n < 3 || r.B.n < 3) { notes.push("With only 2 replicates in a group, the noise estimate itself is rough — treat this as a hint."); }
+
+  // Each group is judged at the recording step it was typed with: a group logged to 0.1
+  // is chunky or not on its own terms, whatever the other group used.
+  const chunkyA = chunky(pa.values, pa.increment);
+  const chunkyB = chunky(pb.values, pb.increment);
+  const chunkyGroups = [];
+  if (chunkyA && chunkyA.chunky) { chunkyGroups.push("A (recorded to " + fmt(pa.increment) + ")"); }
+  if (chunkyB && chunkyB.chunky) { chunkyGroups.push("B (recorded to " + fmt(pb.increment) + ")"); }
+  if (chunkyGroups.length && r.se > 0) {
+    verdict.className = "warn";
+    verdict.innerHTML = "<h2>Measurement increment too coarse to judge the noise</h2>" +
+      "<p>In formula " + chunkyGroups.join(" and ") + " the replicates mostly repeat or move by a single recording step, " +
+      "so round-off distorts the noise estimate (chunky data, in Donald Wheeler's term) and the difference of " + fmt(Math.abs(r.delta)) +
+      " cannot be judged against it. Record one more digit per replicate, or measure with an instrument that reads finer, and paste again; more replicates will not reliably fix this." +
+      (notes.length ? " " + notes.join(" ") : "") + "</p>";
+    return;
+  }
 
   if (r.se === 0) {
     if (Math.abs(r.delta) > 0) {
@@ -255,12 +337,6 @@ function render() {
       (r.needed !== null ? (r.needed <= 99 ? "; to resolve the difference you observed, you'd need roughly <b>" + r.needed + " replicates per formula</b>." : "; the observed difference is so small relative to noise that resolving it would take an impractical number of replicates.") : ".") +
       (notes.length ? " " + notes.join(" ") : "") + "</p>";
   }
-
-  document.getElementById("stats").innerHTML =
-    "<span>A: mean <b>" + fmt(r.A.mean) + "</b> · sd <b>" + fmt(r.A.sd) + "</b> · n <b>" + r.A.n + "</b></span>" +
-    "<span>B: mean <b>" + fmt(r.B.mean) + "</b> · sd <b>" + fmt(r.B.sd) + "</b> · n <b>" + r.B.n + "</b></span>" +
-    "<span>difference <b>" + fmt(r.delta) + "</b></span>" +
-    "<span>standard error <b>" + fmt(r.se) + "</b></span>";
 }
 
 document.getElementById("check").addEventListener("click", render);

@@ -1,4 +1,4 @@
-"""ELN archive export (.eln, RO-Crate) for Reformulation Assurance v0.12.4.
+"""ELN archive export (.eln, RO-Crate) for Reformulation Assurance v0.12.5.
 
 An .eln file is a zipped RO-Crate: a single root folder holding a
 ``ro-crate-metadata.json`` that describes everything beside it. It is the
@@ -44,7 +44,7 @@ from dossier import _canonical_json, _table_html, generate_dossier, generate_wor
 from product_store import ProductStore
 
 SOFTWARE_NAME = "Reformulation Assurance"
-SOFTWARE_VERSION = "0.12.4"
+SOFTWARE_VERSION = "0.12.5"
 SOFTWARE_URL = "https://github.com/TM289012/reformulation-assurance"
 ELN_MEDIA_TYPE = "application/vnd.eln+zip"
 # The crate follows the ELN file format 1.2+202609 on RO-Crate 1.2: the metadata

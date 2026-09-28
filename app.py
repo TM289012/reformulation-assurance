@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.12.4."""
+"""Streamlit application for Reformulation Assurance v0.12.5."""
 from __future__ import annotations
 
 import os
@@ -12,6 +12,7 @@ import streamlit as st
 
 from assurance_v4 import (
     calibration_report,
+    declared_recording_steps,
     default_variation_config,
     result_for_storage,
     simulate_manufacturing_variation,
@@ -83,10 +84,10 @@ except ValueError as exc:  # a malformed value must not take the whole app down
     SMTP_SETTINGS = None
     SMTP_PROBLEM = str(exc)
 
-st.set_page_config(page_title="Reformulation Assurance v0.12.4", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.12.5", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.12.4 · design → run → verify → qualify → approve → export")
+st.caption("v0.12.5 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
@@ -1466,10 +1467,19 @@ elif page == "Qualification":
     if not progress["replicate_summary"].empty:
         st.markdown("### Replicate repeatability")
         st.caption(
-            "Two-stage check, after Donald Wheeler: first each replicate is judged against "
-            "limits built from its siblings (the consistency screen), and only groups whose "
-            "replicates agree are scored on CV. With 3-6 replicates the screen is indicative, "
-            "not definitive."
+            "Three checks. First, Donald Wheeler's chunky-data rule: when a group's moving ranges can take "
+            "only three or fewer possible values within their limits, the recording step is too coarse to "
+            "show the variation between replicates, and round-off biases any estimate of spread built from "
+            "those readings. The real fix is to record one more digit or measure with an instrument that "
+            "reads finer; more replicates will not reliably fix it. Second, Wheeler's check for an odd "
+            "replicate: XmR natural limits (mean plus or minus 2.66 average moving ranges) are computed from "
+            "the other replicates, and a replicate outside them means the formulation is not yet reproducible; "
+            "where the other replicates are too alike to set limits, the tool widens them by the most round-off "
+            "could hide. Third, the project's CV limit, applied to the largest CV the readings allow "
+            "at their recording step, so rounding can never flatter a group; for finely recorded data this is "
+            "barely above the CV itself. The widening and the CV bound are this tool's own safeguards, not "
+            "Wheeler's. All three start from the recording step (set it below). With 3-6 replicates all of "
+            "this is indicative, not definitive, and the first two depend on run order."
         )
         st.dataframe(progress["replicate_summary"], use_container_width=True, hide_index=True)
         with st.expander("Running records — look before computing"):
@@ -1482,12 +1492,41 @@ elif page == "Qualification":
                 if group_labels:
                     chosen_group = st.selectbox("Replicate group", group_labels, key="running_record_group")
                     group_frame = completed_runs[completed_runs["replicate_group"].astype(str) == chosen_group]
+                    if "replicate_index" in group_frame.columns:
+                        group_frame = group_frame.sort_values("replicate_index", kind="stable")
                     response_names = [item["response"] for item in config["response_specs"]]
                     for response_name in response_names:
                         series = pd.to_numeric(group_frame.get(response_name), errors="coerce").dropna()
                         if len(series) >= 2:
                             st.caption(f"{response_name} — {len(series)} replicates in run order")
                             st.line_chart(series.reset_index(drop=True))
+
+    st.markdown("### Recording steps")
+    st.caption(
+        "The smallest step each response is recorded in: 0.01 for a pH meter read to two decimals, 50 for a "
+        "viscosity logged in steps of 50. Wheeler's chunky-data rule starts from it, and so does the largest CV "
+        "a chunky group's readings allow. Leave 0 to read it off the numbers, which errs coarse and cannot see "
+        "trailing zeros (pH 7.00 is stored as 7)."
+    )
+    current_steps = declared_recording_steps(config)
+    with st.form("recording_steps"):
+        step_columns = st.columns(max(1, min(4, len(response_columns))))
+        new_steps: dict[str, float] = {}
+        for idx, response in enumerate(response_columns):
+            with step_columns[idx % len(step_columns)]:
+                new_steps[response] = st.number_input(
+                    response,
+                    min_value=0.0,
+                    value=float(current_steps.get(response) or 0.0),
+                    format="%g",
+                    key=f"recording_step_{response}",
+                )
+        if st.form_submit_button("Save recording steps", disabled=not can_edit):
+            updated = ensure_v04_config(config)
+            updated["recording_steps"] = {name: float(value) for name, value in new_steps.items() if value and value > 0}
+            store.update_project_config(project_id, updated)
+            st.success("Recording steps saved.")
+            st.rerun()
 
     st.markdown("### Configure qualification gates")
     selected_stage = st.selectbox("Stage to configure", QUALIFICATION_STAGES)

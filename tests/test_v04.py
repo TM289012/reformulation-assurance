@@ -96,12 +96,18 @@ class V04LifecycleTests(unittest.TestCase):
         experiments = cls.store.list_experiments(cls.project_id, batch_id=cls.batch_id)
         cls.original = experiments.iloc[0]
         cls.created_replicates = cls.store.create_replicates(str(cls.original["id"]), 2)
-        valid = {"adhesion": 8.5, "viscosity_cp": 2300.0, "dry_time_min": 35.0, "gloss": 88.0}
+        # Replicates read the way a real bench does: every response varies a little
+        # from run to run, recorded to the instrument's resolution. Identical readings
+        # would be chunky data (v0.12.5, after Wheeler) and could not pass the gate.
+        readings = [
+            {"adhesion": 8.51, "viscosity_cp": 2300.0, "dry_time_min": 35.2, "gloss": 88.1},
+            {"adhesion": 8.53, "viscosity_cp": 2315.0, "dry_time_min": 35.0, "gloss": 87.8},
+            {"adhesion": 8.49, "viscosity_cp": 2290.0, "dry_time_min": 35.1, "gloss": 88.3},
+        ]
         group = cls.store.list_experiments(cls.project_id, batch_id=cls.batch_id)
         group = group[group["replicate_group"] == cls.original["replicate_group"]]
-        for _, row in group.iterrows():
-            adjusted = dict(valid)
-            adjusted["adhesion"] += 0.01 * int(row["replicate_index"])
+        for position, (_, row) in enumerate(group.iterrows()):
+            adjusted = dict(readings[position % len(readings)])
             cls.store.update_experiment(
                 str(row["id"]),
                 status="completed",
