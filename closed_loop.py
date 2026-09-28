@@ -231,7 +231,7 @@ def qualification_progress(store: ProjectStore, project_id: str) -> dict[str, An
             for _, group in stage_groups.iterrows():
                 if int(group.get("completed_replicates", 0)) < min_replicates:
                     continue
-                # Stage 1 (Wheeler's consistency screen, XmR limits from the other replicates):
+                # Stage 1 (the consistency screen, XmR limits from the other replicates):
                 # every judged response must have replicates consistent with each
                 # other before the CV means anything. Where the siblings are chunky
                 # the limits are widened for round-off, so a flag from widened limits

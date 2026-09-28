@@ -364,8 +364,8 @@ def wheeler_screen_detail(values: list[float], increment: float | None = None) -
        a CV), so the gates judge a chunky group on :func:`cv_upper_bound` instead of
        its CV. A finer recording step is the real fix; more replicates will not
        reliably fix it.
-    2. Consistency screen, Wheeler's procedure for small replicate sets (from his
-       email to the author): judge a value that looks out of line against XmR natural
+    2. Consistency screen for small replicate sets: judge a value that looks out of
+       line against XmR natural
        limits (mean +/- 2.66 x average moving range) computed from the OTHER values in
        run order. Outside, the formulation is not yet reproducible; inside, it is
        probably reproducible and the CV may quantify its repeatability. The tool tests

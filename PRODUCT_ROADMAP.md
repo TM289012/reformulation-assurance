@@ -10,9 +10,9 @@ The same app now runs on PostgreSQL with self-serve workspaces, so a lab, a bran
 
 The qualification dossier exports as a `.eln` archive (ELN Consortium format, a zipped RO-Crate) that imports into eLabFTW, RSpace and other notebooks as one experiment entry with every evidence file attached and hashed in the metadata. The path was chosen in the open: the eLabFTW maintainer recommended `.eln` over a CSV or API integration, and asked that the JSON export stay, so it did. Distribution through the notebooks labs already keep, not through a connector this project would have to sell. See CHANGELOG.md.
 
-## Shipped: v0.10.0 — The Wheeler release (September 2026)
+## Shipped: v0.10.0 — Honest small samples (September 2026)
 
-The confirmation gate is now two-stage, following the procedure Donald J. Wheeler (2010 Deming Medalist) described in correspondence: look at the replicate running record first, judge any suspect value against limits computed from the other replicates, and only let the CV mean anything once the replicates agree. The drift checker also stopped issuing hollow all-clears below the small-sample floors of an XmR chart (first/last point can't flag below 6 values, middle points below 8, limits stabilize ~17+). See CHANGELOG.md.
+The confirmation gate is now two-stage (with thanks to Donald J. Wheeler for his advice): look at the replicate running record first, judge any suspect value against limits computed from the other replicates, and only let the CV mean anything once the replicates agree. The drift checker also stopped issuing hollow all-clears below the small-sample floors of an XmR chart (first/last point can't flag below 5 values, middle points below 8, limits stabilize ~17+). See CHANGELOG.md.
 
 ## Shipped: v0.9.0 — Excel round-trip (August 2026)
 

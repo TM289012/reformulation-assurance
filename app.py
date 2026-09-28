@@ -1471,7 +1471,7 @@ elif page == "Qualification":
             "only three or fewer possible values within their limits, the recording step is too coarse to "
             "show the variation between replicates, and round-off biases any estimate of spread built from "
             "those readings. The real fix is to record one more digit or measure with an instrument that "
-            "reads finer; more replicates will not reliably fix it. Second, Wheeler's check for an odd "
+            "reads finer; more replicates will not reliably fix it. Second, a check for an odd "
             "replicate: XmR natural limits (mean plus or minus 2.66 average moving ranges) are computed from "
             "the other replicates, and a replicate outside them means the formulation is not yet reproducible; "
             "where the other replicates are too alike to set limits, the tool widens them by the most round-off "

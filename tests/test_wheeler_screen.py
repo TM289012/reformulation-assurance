@@ -1,4 +1,4 @@
-"""Tests for the v0.10.0 replicate consistency screen (after Donald Wheeler).
+"""Tests for the replicate consistency screen (XmR limits from the other replicates) and the chunky-data rule.
 
 The screen judges each replicate against natural limits (mean ± 2.66 × average
 moving range) computed from the other replicates in run order. Only groups

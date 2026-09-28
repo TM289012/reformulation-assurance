@@ -28,7 +28,7 @@ The core loop:
 2. **Model** — Gaussian-process and random-forest models learn how your ingredients and process variables drive each specification.
 3. **Recommend** — the platform proposes a small, diverse batch of experiments, each with a stated purpose: best overall trade-off, highest modeled success, smallest change from your proven formula, most informative, lowest cost. Every candidate carries predictions, uncertainty, and extrapolation warnings.
 4. **Run and record** — you run the experiments in your lab and enter results. The models retrain after every result.
-5. **Qualify** — staged gates take a promising candidate through confirmation replicates (each group is checked with Donald Wheeler's chunky-data rule and screened for an odd replicate the way he suggested, with XmR limits computed from the other replicates, before its CV counts; the CV limit is applied to the largest CV the readings allow at their recording step, a safeguard the tool adds so rounding can never flatter a group, starting from the step you declare or one read off the data), process-window studies, and supplier-lot variation, with robustness checked by Monte Carlo simulation of manufacturing variation.
+5. **Qualify** — staged gates take a promising candidate through confirmation replicates (each group is checked with Donald Wheeler's chunky-data rule and screened for an odd replicate with XmR limits computed from the other replicates before its CV counts; the CV limit is applied to the largest CV the readings allow at their recording step, a safeguard the tool adds so rounding can never flatter a group, starting from the step you declare or one read off the data), process-window studies, and supplier-lot variation, with robustness checked by Monte Carlo simulation of manufacturing variation.
 6. **Approve and export** — approvals are electronic signatures bound to a SHA-256 hash of the exact evidence they were signed against, and the full frozen evidence snapshot is stored with every signature (the practice used by eLabFTW), so you can always show exactly what was signed. If the evidence changes afterward, the mismatch is visible. One click exports an audit-ready dossier: every experiment, prediction, calibration record, approval, signed snapshot, and the audit trail, with checksums — as a ZIP, an Excel workbook, or a `.eln` notebook archive whose metadata carries the SHA-256 of every attached file.
 
 The part most tools skip is the honesty loop: predictions are frozen at recommendation time and scored against your actual lab results later — error, interval coverage, Brier scores — so the platform builds a track record you can check instead of asking for trust.
@@ -132,6 +132,12 @@ More detail in [ARCHITECTURE.md](ARCHITECTURE.md); version history in [CHANGELOG
 ## Contributing and feedback
 
 The most valuable contribution right now is domain criticism: wrong terminology, unrealistic qualification stages, a spec or test method no real lab would use, a statistical claim that overreaches. Open an issue and be blunt.
+
+## Credits and references
+
+- Chunky-data check: Donald J. Wheeler, "What is Chunky Data?", *Quality Digest Daily*, 7 December 2011 (Manuscript 235), [spcpress.com/pdf/DJW235.pdf](https://www.spcpress.com/pdf/DJW235.pdf).
+- XmR natural process limits: Donald J. Wheeler, *Understanding Variation: The Key to Managing Chaos*, 2nd edition, SPC Press, 2000.
+- With thanks to Donald J. Wheeler for his advice on judging repeatability from a handful of replicates. The safeguards the tool adds on top of the published rules (the recording-step bound on the CV and the widened limits) are the tool's own, not his.
 
 ## License
 
