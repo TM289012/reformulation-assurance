@@ -1,18 +1,18 @@
 # Reformulation Assurance
 
-**Replace an ingredient without breaking the product — and leave an audit trail a skeptic can check.**
+**Replace an ingredient without breaking the product, and leave an audit trail a skeptic can check.**
 
-When an ingredient gets discontinued or restricted, proving the replacement works isn't optional — someone has to defend that result later. Run the project in here and the proof assembles itself.
+When an ingredient gets discontinued or restricted, proving the replacement works isn't optional, because someone has to defend that result later. Run the project in here and the proof assembles itself.
 
-**[▶ Try the live demo in your browser](https://reformulation-assurance-demo.streamlit.app/)** — nothing to install, a cosmetics reformulation project preloaded, one click to enter. It's a shared public sandbox that resets periodically, so never put real formulas in it. (First load can take ~30 seconds if the app is waking up.)
+**[▶ Try the live demo in your browser](https://reformulation-assurance-demo.streamlit.app/)**. There's nothing to install, a cosmetics reformulation project is preloaded, and one click gets you in. It's a shared public sandbox that resets periodically, so never put real formulas in it. (First load can take ~30 seconds if the app is waking up.)
 
-Reformulation Assurance is an open-source, local-first workbench for ingredient-replacement projects in formulated products: coatings, adhesives, sealants — anything mixed to a specification. It takes a team from "our supplier discontinued this plasticizer" to a qualified replacement, with every experiment, model prediction, approval, and decision recorded along the way.
+Reformulation Assurance is an open-source, local-first workbench for ingredient-replacement projects in formulated products like coatings, adhesives, sealants, or anything else mixed to a specification. It takes a team from "our supplier discontinued this plasticizer" to a qualified replacement, with every experiment, model prediction, approval, and decision recorded along the way.
 
-It runs entirely on your machine. Your formulations live in a SQLite file you own. Nothing is uploaded anywhere, there is no telemetry, and there is no cloud account — which matters, because formulations are usually the most confidential thing a company has.
+It runs entirely on your machine. Your formulations live in a SQLite file you own. Nothing is uploaded anywhere, there is no telemetry, and there is no cloud account. That matters, because formulations are usually the most confidential thing a company has.
 
 **Prefer not to install anything?** A hosted instance with private, self-serve workspaces is at [reformulation-assurance.streamlit.app](https://reformulation-assurance.streamlit.app): create a workspace, invite your team or your students, free while it is in pilot. It is a shared server without MFA or SSO, so keep trade-secret formulations on the local install. To run your own instance, see [DEPLOY.md](DEPLOY.md).
 
-**It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep — CSV evidence tables, a printable dossier, the signed evidence snapshots, an Excel workbook, or a single `.eln` archive that imports into eLabFTW, RSpace and other lab notebooks as one entry. Local files in, local files out, no lock-in.
+**It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep, including CSV evidence tables, a printable dossier, the signed evidence snapshots, an Excel workbook, and a single `.eln` archive that imports into eLabFTW, RSpace and other lab notebooks as one entry. Local files in, local files out, no lock-in.
 
 ![Demo: generate a batch, record a result, sign the evidence, export the dossier](assets/demo.gif)
 
@@ -24,18 +24,18 @@ It runs entirely on your machine. Your formulations live in a SQLite file you ow
 
 The core loop:
 
-1. **Import history** — your past experiments from CSV or Excel: ingredient percentages, process conditions, measured results, including failed and incomplete runs (failures are evidence too).
-2. **Model** — Gaussian-process and random-forest models learn how your ingredients and process variables drive each specification.
-3. **Recommend** — the platform proposes a small, diverse batch of experiments, each with a stated purpose: best overall trade-off, highest modeled success, smallest change from your proven formula, most informative, lowest cost. Every candidate carries predictions, uncertainty, and extrapolation warnings.
-4. **Run and record** — you run the experiments in your lab and enter results. The models retrain after every result.
-5. **Qualify** — staged gates take a promising candidate through confirmation replicates (each group is checked with Donald Wheeler's chunky-data rule and screened for an odd replicate with XmR limits computed from the other replicates before its CV counts; the CV limit is applied to the largest CV the readings allow at their recording step, a safeguard the tool adds so rounding can never flatter a group, starting from the step you declare or one read off the data), process-window studies, and supplier-lot variation, with robustness checked by Monte Carlo simulation of manufacturing variation.
-6. **Approve and export** — approvals are electronic signatures bound to a SHA-256 hash of the exact evidence they were signed against, and the full frozen evidence snapshot is stored with every signature (the practice used by eLabFTW), so you can always show exactly what was signed. If the evidence changes afterward, the mismatch is visible. One click exports an audit-ready dossier: every experiment, prediction, calibration record, approval, signed snapshot, and the audit trail, with checksums — as a ZIP, an Excel workbook, or a `.eln` notebook archive whose metadata carries the SHA-256 of every attached file.
+1. **Import history.** Bring your past experiments from CSV or Excel, with ingredient percentages, process conditions, and measured results, including failed and incomplete runs (failures are evidence too).
+2. **Model.** Gaussian-process and random-forest models learn how your ingredients and process variables drive each specification.
+3. **Recommend.** The platform proposes a small, diverse batch of experiments, each with a stated purpose, such as the best overall trade-off, the highest modeled success, the smallest change from your proven formula, the most informative, or the lowest cost. Every candidate carries predictions, uncertainty, and extrapolation warnings.
+4. **Run and record.** You run the experiments in your lab and enter results. The models retrain after every result.
+5. **Qualify.** Staged gates take a promising candidate through confirmation replicates (each group is checked with Donald Wheeler's chunky-data rule and screened for an odd replicate with XmR limits computed from the other replicates before its CV counts; the CV limit is applied to the largest CV the readings allow at their recording step, a safeguard the tool adds so rounding can never flatter a group, starting from the step you declare or one read off the data), process-window studies, and supplier-lot variation, with robustness checked by Monte Carlo simulation of manufacturing variation.
+6. **Approve and export.** Approvals are electronic signatures bound to a SHA-256 hash of the exact evidence they were signed against, and the full frozen evidence snapshot is stored with every signature (the practice used by eLabFTW), so you can always show exactly what was signed. If the evidence changes afterward, the mismatch is visible. One click exports an audit-ready dossier, with checksums, as a ZIP, an Excel workbook, or a `.eln` notebook archive whose metadata carries the SHA-256 of every attached file. The dossier holds every experiment, prediction, calibration record, approval, signed snapshot, and the audit trail.
 
-The part most tools skip is the honesty loop: predictions are frozen at recommendation time and scored against your actual lab results later — error, interval coverage, Brier scores — so the platform builds a track record you can check instead of asking for trust.
+The part most tools skip is the honesty loop. Predictions are frozen at recommendation time and later scored against your actual lab results (error, interval coverage, Brier scores), so the platform builds a track record you can check instead of asking for trust.
 
 ## Who it's for
 
-Small and mid-size formulation teams who live in spreadsheets and just got forced into a reformulation: a discontinued raw material, a restricted substance (PFAS-style regulation), a cost blowout, or a second-supplier qualification. If you have roughly 15–200 historical experiments and no data-science team, this is aimed at you.
+Small and mid-size formulation teams who live in spreadsheets and just got forced into a reformulation: a discontinued raw material, a restricted substance (PFAS-style regulation), a cost blowout, or a second-supplier qualification. If you have roughly 15 to 200 historical experiments and no data-science team, this is aimed at you.
 
 ## Quickstart (about 10 minutes)
 
@@ -52,10 +52,10 @@ python -m streamlit run app.py
 
 Your browser opens `http://localhost:8501`. The first account you create becomes the workspace owner.
 
-Then take the built-in tour — no data needed:
+Then take the built-in tour, which needs no data.
 
 1. **New project → Start with demo → Create v0.6 demo project.** You get a coatings project preloaded with completed and failed historical trials.
-2. **Recommendations → Generate next batch.** Model fitting takes ~30–60 seconds. You'll get five candidates with different purposes, predictions, uncertainty, and a plain-language note about what the probabilities do and don't mean.
+2. **Recommendations → Generate next batch.** Model fitting takes about 30 to 60 seconds. You'll get five candidates with different purposes, predictions, uncertainty, and a plain-language note about what the probabilities do and don't mean.
 3. **Approve and freeze batch**, then go to **Experiment loop**, mark an experiment completed, and enter plausible numbers (e.g. adhesion 8.5, viscosity 2300, dry time 35, gloss 90). Watch the models retrain.
 4. Open **Approvals & dossier**: the evidence hash has changed because the evidence did. Sign the discovery stage (it re-authenticates you and binds the signature to that exact hash), then export the dossier and look inside the zip.
 
@@ -69,24 +69,24 @@ The suite also runs unchanged against PostgreSQL (`REFORMULATION_FORCE_DATABASE_
 
 ## Using your own data
 
-Two example datasets ship with the repo if you want to try the import wizard first: `demo_coatings_reformulation.csv` (replacing a legacy plasticizer in a coating — same scenario as the built-in demo) and `demo_cosmetics_emulsifier_swap.csv` (replacing a legacy PEG emulsifier in an oil-in-water lotion, with viscosity, pH, stability, and spreadability specs). Import either through **New project → Import your CSV**.
+Two example datasets ship with the repo if you want to try the import wizard first: `demo_coatings_reformulation.csv` (replacing a legacy plasticizer in a coating, the same scenario as the built-in demo) and `demo_cosmetics_emulsifier_swap.csv` (replacing a legacy PEG emulsifier in an oil-in-water lotion, with viscosity, pH, stability, and spreadability specs). Import either through **New project → Import your CSV**.
 
 Bring a CSV or Excel sheet where each row is one experiment:
 
 - **Ingredient columns** (they should sum to a fixed total, e.g. 100)
 - **Process columns** (temperatures, times, speeds)
-- **Categorical columns** (supplier family, equipment id) — optional
+- **Categorical columns** (supplier family, equipment id), optional
 - **Response columns** (the properties you measure against specs)
-- **Status column** (completed / failed / infeasible…) — optional but valuable
+- **Status column** (completed / failed / infeasible…), optional but valuable
 
 **New project → Import your CSV** walks you through mapping columns, setting mixture bounds, choosing the ingredient to remove, and defining specifications. A readiness report flags missing values, duplicates, and impossible totals before anything is modeled.
 
 ## Single-question tools (no install)
 
-Two standalone one-page tools answer questions formulators hit mid-experiment. Each runs entirely in your browser — no account, nothing uploaded, view-source friendly:
+Two standalone one-page tools answer questions formulators hit mid-experiment. Each runs entirely in your browser, needs no account, uploads nothing, and can be read with View Source.
 
-- **[Baseline Drift Checker](https://tm289012.github.io/reformulation-assurance/drift-checker.html)** — paste time-ordered measurements of anything that should be stable (a control batch, a reference standard, an instrument baseline) and get an XmR-chart verdict: routine noise, or a shift/drift worth investigating. It applies Wheeler's chunky-data rule first, so readings recorded too coarsely get "record one more digit" instead of false alarms.
-- **[Replicate Noise Checker](https://tm289012.github.io/reformulation-assurance/replicate-checker.html)** — paste a few replicates of formula A and formula B and learn whether the difference is real, suggestive, or inside your noise — plus the smallest difference your replicate count could even detect.
+- **[Baseline Drift Checker](https://tm289012.github.io/reformulation-assurance/drift-checker.html).** Paste time-ordered measurements of anything that should be stable (a control batch, a reference standard, an instrument baseline) and get an XmR-chart verdict of routine noise or a shift or drift worth investigating. It applies Wheeler's chunky-data rule first, so readings recorded too coarsely get "record one more digit" instead of false alarms.
+- **[Replicate Noise Checker](https://tm289012.github.io/reformulation-assurance/replicate-checker.html).** Paste a few replicates of formula A and formula B and learn whether the difference is real, suggestive, or inside your noise, plus the smallest difference your replicate count could even detect.
 
 ## For courses
 
@@ -98,17 +98,17 @@ This project prefers honest labels over impressive ones. The short version:
 
 - `probability_all_specs` is a modeled joint probability that assumes responses are independent given the inputs. Correlations are not modeled.
 - The feasibility estimate is a separate, uncalibrated classifier and is never blended into anything labeled a probability.
-- Candidate generation is model-ranked random search over the bounded mixture space — not Bayesian optimization, and it says so.
+- Candidate generation is model-ranked random search over the bounded mixture space. It is not Bayesian optimization, and it says so.
 - Backtests cross-validate the same model construction that gets deployed, hyperparameter fitting included.
 - The calibration pages exist so the platform can be caught being wrong: frozen predictions vs. actual results, at run level and formulation level.
 
-The full disclosure, including known weaknesses, is in [MODELING_NOTES.md](MODELING_NOTES.md). If you're a formulator or statistician and can find a problem that isn't already listed there, please open an issue — that's exactly the feedback this project wants.
+The full disclosure, including known weaknesses, is in [MODELING_NOTES.md](MODELING_NOTES.md). If you're a formulator or statistician and can find a problem that isn't already listed there, please open an issue. That's exactly the feedback this project wants.
 
 ## What this is not
 
 This is a pilot-stage prototype, and the boundaries are stated rather than implied:
 
-- Not a validated quality system, and signatures are internal approval records — no FDA 21 CFR Part 11 or EU Annex 11 claims.
+- Not a validated quality system. Signatures are internal approval records, with no FDA 21 CFR Part 11 or EU Annex 11 claims.
 - No SSO or MFA; authentication is local (PBKDF2, throttled after repeated failures) and suitable for a trusted team or a course, not for trade-secret formulations on a shared server.
 - Local SQLite by default. The hosted mode ([DEPLOY.md](DEPLOY.md)) is for a small team or classroom that has decided a shared instance is acceptable for its data.
 - Decision support only: qualified professionals remain responsible for chemical safety, regulatory review, physical execution, and final product approval.
@@ -116,16 +116,16 @@ This is a pilot-stage prototype, and the boundaries are stated rather than impli
 
 ## Project layout
 
-- `app.py` — Streamlit interface
-- `reformulation_engine.py` — candidate generation, models, scoring
-- `closed_loop.py` — retraining loop and qualification gates
-- `assurance_v4.py` — robustness simulation and prospective calibration
-- `process_window.py` — bounded process-window study designs
-- `project_store.py` / `product_store.py` / `pilot_store.py` — layered store: scientific ledger → organizations and approvals → collaboration and operations
-- `db_backend.py` — the SQLite/PostgreSQL adapter under the stores
-- `dossier.py` — evidence hashing and dossier export
-- `eln_export.py` — `.eln` (RO-Crate) notebook archive export and CLI
-- `security.py`, `artifact_vault.py`, `backup_service.py` — password hashing, encrypted artifacts, verified backups
+- `app.py`: Streamlit interface
+- `reformulation_engine.py`: candidate generation, models, scoring
+- `closed_loop.py`: retraining loop and qualification gates
+- `assurance_v4.py`: robustness simulation and prospective calibration
+- `process_window.py`: bounded process-window study designs
+- `project_store.py` / `product_store.py` / `pilot_store.py`: a layered store, from the scientific ledger to organizations and approvals to collaboration and operations
+- `db_backend.py`: the SQLite/PostgreSQL adapter under the stores
+- `dossier.py`: evidence hashing and dossier export
+- `eln_export.py`: `.eln` (RO-Crate) notebook archive export and CLI
+- `security.py`, `artifact_vault.py`, `backup_service.py`: password hashing, encrypted artifacts, verified backups
 
 More detail in [ARCHITECTURE.md](ARCHITECTURE.md); version history in [CHANGELOG.md](CHANGELOG.md).
 
@@ -141,4 +141,4 @@ The most valuable contribution right now is domain criticism: wrong terminology,
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
