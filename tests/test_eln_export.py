@@ -78,7 +78,7 @@ class ElnExportTests(unittest.TestCase):
         self.assertEqual(publisher["@type"], "Organization")
         root = nodes["./"]
         self.assertEqual(root["@type"], "Dataset")
-        # RO-Crate 1.2 with the ELN 1.2+202609 declaration: both profiles are referenced from the
+        # RO-Crate 1.2 with the ELN 1.2+20260923 declaration: both profiles are referenced from the
         # root and described as Profile entities; the root names a publisher and a licence.
         self.assertEqual(RO_CRATE_CONFORMS_TO, "https://w3id.org/ro/crate/1.2")
         self.assertEqual(metadata["@context"], "https://w3id.org/ro/crate/1.2/context")
@@ -90,7 +90,7 @@ class ElnExportTests(unittest.TestCase):
         licence = nodes[root["license"]["@id"]]
         self.assertEqual(licence["@type"], "CreativeWork")
         self.assertTrue(licence["name"] and licence["description"])
-        # Root hasPart is the import list (ELN format 1.2+202609): the experiment entry
+        # Root hasPart is the import list (ELN format 1.2+20260923): the experiment entry
         # first, then every attached file; importers that make one record per root
         # Dataset skip the File entries.
         experiment = nodes[manifest["experiment_id"]]

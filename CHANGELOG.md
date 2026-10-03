@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.12.6 (2026-10-02)
+
+- **`.eln` export declares ELN file format `1.2+20260923`.** The ELN Consortium's merged test suite (TheELNFileFormat #159) names the September 2026 version `1.2+20260923`, so the root Dataset's `conformsTo` and the specification `Profile` node now use `https://purl.archive.org/purl/elnconsortium/eln-spec/1.2+20260923` in place of the shorter `1.2+202609`. A crate with the old identifier is read by the suite as plain RO-Crate 1.2 and skips the consortium's own checks. Nothing else in the archive changes.
+
 ## v0.12.5 (2026-09-28)
 
 - **Chunky-data rule, after Donald Wheeler.** Identical or near-identical replicate readings do not measure repeatability; they show only that the variation is smaller than the recording step can resolve. Following Donald J. Wheeler's "What is Chunky Data?" (Quality Digest Daily, 7 December 2011), each replicate group goes through his three steps: determine the recording step, compute the moving-range chart's upper limit (3.268 times the average moving range) from the group's own readings in run order, and count the possible range values within it, zero included. Three or fewer is chunky; four is his borderline-safe condition and is judged normally. The counting reproduces the paper's own figures (19 possible values in Figure 3, 2 in Figure 4, 4 at the borderline in Table 3).

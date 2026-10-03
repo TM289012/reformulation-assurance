@@ -1,4 +1,4 @@
-"""ELN archive export (.eln, RO-Crate) for Reformulation Assurance v0.12.5.
+"""ELN archive export (.eln, RO-Crate) for Reformulation Assurance v0.12.6.
 
 An .eln file is a zipped RO-Crate: a single root folder holding a
 ``ro-crate-metadata.json`` that describes everything beside it. It is the
@@ -44,17 +44,17 @@ from dossier import _canonical_json, _table_html, generate_dossier, generate_wor
 from product_store import ProductStore
 
 SOFTWARE_NAME = "Reformulation Assurance"
-SOFTWARE_VERSION = "0.12.5"
+SOFTWARE_VERSION = "0.12.6"
 SOFTWARE_URL = "https://github.com/TM289012/reformulation-assurance"
 ELN_MEDIA_TYPE = "application/vnd.eln+zip"
-# The crate follows the ELN file format 1.2+202609 on RO-Crate 1.2: the metadata
+# The crate follows the ELN file format 1.2+20260923 on RO-Crate 1.2: the metadata
 # descriptor declares the RO-Crate version, the root Dataset declares both the
 # RO-Crate profile and the ELN specification, and every referenced entity is a
 # separate node in the graph (RO-Crate requires a flattened JSON-LD document, and
-# the consortium's checks run only on crates that declare 1.2+202609).
+# the consortium's checks run only on crates that declare 1.2+20260923).
 RO_CRATE_CONTEXT = "https://w3id.org/ro/crate/1.2/context"
 RO_CRATE_CONFORMS_TO = "https://w3id.org/ro/crate/1.2"
-ELN_SPEC_CONFORMS_TO = "https://purl.archive.org/purl/elnconsortium/eln-spec/1.2+202609"
+ELN_SPEC_CONFORMS_TO = "https://purl.archive.org/purl/elnconsortium/eln-spec/1.2+20260923"
 ELN_FORMAT_DESCRIPTOR_VERSION = "1.0"
 LICENSE_ID = "#license"
 
@@ -420,7 +420,7 @@ def generate_eln(
         {
             "@id": ELN_SPEC_CONFORMS_TO,
             "@type": ["CreativeWork", "Profile"],
-            "name": "ELN-File Format 1.2+202609 Specification",
+            "name": "ELN-File Format 1.2+20260923 Specification",
         },
     ]
     person_node = {
@@ -463,7 +463,7 @@ def generate_eln(
             "license": {"@id": LICENSE_ID},
             "conformsTo": [{"@id": RO_CRATE_CONFORMS_TO}, {"@id": ELN_SPEC_CONFORMS_TO}],
             # The root hasPart is the import list: the experiment entry first, then every
-            # attached file, each of which the entry also lists (spec 1.2+202609). Importers
+            # attached file, each of which the entry also lists (spec 1.2+20260923). Importers
             # that create one record per root Dataset skip the File entries here.
             "hasPart": [{"@id": experiment_id}, *({"@id": node["@id"]} for node in file_nodes)],
         },
