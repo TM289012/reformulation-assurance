@@ -4,15 +4,17 @@
 
 When an ingredient gets discontinued or restricted, proving the replacement works isn't optional, because someone has to defend that result later. Run the project in here and the proof assembles itself.
 
-**[▶ Try the live demo in your browser](https://reformulation-assurance-demo.streamlit.app/)**. There's nothing to install, a cosmetics reformulation project is preloaded, and one click gets you in. It's a shared public sandbox that resets periodically, so never put real formulas in it. (First load can take ~30 seconds if the app is waking up.)
+**[▶ Try the live demo in your browser](https://reformulation-assurance-demo.streamlit.app/)**. There's nothing to install, two projects are preloaded (a cosmetics emulsifier swap and a food color replacement for FD&C Red No. 3, which opens directly at [?demo=food](https://reformulation-assurance-demo.streamlit.app/?demo=food)), and one click gets you in. It's a shared public sandbox that resets periodically, so never put real formulas in it. (First load can take ~30 seconds if the app is waking up.)
 
-Reformulation Assurance is an open-source, local-first workbench for ingredient-replacement projects in formulated products like coatings, adhesives, sealants, or anything else mixed to a specification. It takes a team from "our supplier discontinued this plasticizer" to a qualified replacement, with every experiment, model prediction, approval, and decision recorded along the way.
+**Facing a deadline?** The worked example for the Red No. 3 food deadline (15 January 2027) is a 15-minute walkthrough: [Replacing FD&C Red No. 3](https://tm289012.github.io/reformulation-assurance/red3-replacement.html). The same loop covers a preservative swap for Washington's formaldehyde-releaser restriction or any other forced substitution.
+
+Reformulation Assurance is an open-source, local-first workbench for ingredient-replacement projects in formulated products: foods, cosmetics, coatings, adhesives, sealants, or anything else mixed to a specification. It takes a team from "our supplier discontinued this plasticizer" to a qualified replacement, with every experiment, model prediction, approval, and decision recorded along the way.
 
 It runs entirely on your machine. Your formulations live in a SQLite file you own. Nothing is uploaded anywhere, there is no telemetry, and there is no cloud account. That matters, because formulations are usually the most confidential thing a company has.
 
 **Prefer not to install anything?** A hosted instance with private, self-serve workspaces is at [reformulation-assurance.streamlit.app](https://reformulation-assurance.streamlit.app): create a workspace, invite your team or your students, free while it is in pilot. It is a shared server without MFA or SSO, so keep trade-secret formulations on the local install. To run your own instance, see [DEPLOY.md](DEPLOY.md).
 
-**It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep, including CSV evidence tables, a printable dossier, the signed evidence snapshots, an Excel workbook, and a single `.eln` archive that imports into eLabFTW, RSpace and other lab notebooks as one entry. Local files in, local files out, no lock-in.
+**It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep, including CSV evidence tables, a printable dossier, the signed evidence snapshots, an Excel workbook, and a single `.eln` archive that imports into eLabFTW, RSpace and other lab notebooks as one entry. The `.eln` export is listed among the implementations on the [ELN Consortium's file-format repository](https://github.com/TheELNConsortium/TheELNFileFormat), and the importer fix it prompted in eLabFTW is in that project's main branch ([elabftw/elabftw#7517](https://github.com/elabftw/elabftw/pull/7517)). Local files in, local files out, no lock-in.
 
 ![Demo: generate a batch, record a result, sign the evidence, export the dossier](assets/demo.gif)
 
@@ -35,7 +37,7 @@ The part most tools skip is the honesty loop. Predictions are frozen at recommen
 
 ## Who it's for
 
-Small and mid-size formulation teams who live in spreadsheets and just got forced into a reformulation: a discontinued raw material, a restricted substance (PFAS-style regulation), a cost blowout, or a second-supplier qualification. If you have roughly 15 to 200 historical experiments and no data-science team, this is aimed at you.
+Small and mid-size formulation teams who live in spreadsheets and just got forced into a reformulation: a color additive losing its listing (FD&C Red No. 3 in food from 15 January 2027), a preservative restricted by a state (Washington's formaldehyde-releaser ban from 1 January 2027), a discontinued raw material, PFAS-style regulation, a cost blowout, or a second-supplier qualification. If you have roughly 15 to 200 historical experiments and no data-science team, this is aimed at you.
 
 ## Quickstart (about 10 minutes)
 
@@ -54,12 +56,12 @@ Your browser opens `http://localhost:8501`. The first account you create becomes
 
 Then take the built-in tour, which needs no data.
 
-1. **New project → Start with demo → Create v0.6 demo project.** You get a coatings project preloaded with completed and failed historical trials.
+1. **New project → Start with demo**, pick an example (coatings plasticizer, cosmetics PEG emulsifier, or food Red No. 3 replacement) and click **Create demo project**. You get a project preloaded with completed and failed historical trials and its specifications already set.
 2. **Recommendations → Generate next batch.** Model fitting takes about 30 to 60 seconds. You'll get five candidates with different purposes, predictions, uncertainty, and a plain-language note about what the probabilities do and don't mean.
-3. **Approve and freeze batch**, then go to **Experiment loop**, mark an experiment completed, and enter plausible numbers (e.g. adhesion 8.5, viscosity 2300, dry time 35, gloss 90). Watch the models retrain.
+3. **Approve and freeze batch**, then go to **Experiment loop**, mark an experiment completed, and enter plausible numbers (for the coatings example, adhesion 8.5, viscosity 2300, dry time 35, gloss 90; for the food example, color difference 2.1, a* 44, retention 90, flavor 8.0). Watch the models retrain.
 4. Open **Approvals & dossier**: the evidence hash has changed because the evidence did. Sign the discovery stage (it re-authenticates you and binds the signature to that exact hash), then export the dossier and look inside the zip.
 
-To run the test suite (110 tests):
+To run the test suite (117 tests):
 
 ```bash
 python -m unittest discover -s tests
@@ -69,7 +71,7 @@ The suite also runs unchanged against PostgreSQL (`REFORMULATION_FORCE_DATABASE_
 
 ## Using your own data
 
-Two example datasets ship with the repo if you want to try the import wizard first: `demo_coatings_reformulation.csv` (replacing a legacy plasticizer in a coating, the same scenario as the built-in demo) and `demo_cosmetics_emulsifier_swap.csv` (replacing a legacy PEG emulsifier in an oil-in-water lotion, with viscosity, pH, stability, and spreadability specs). Import either through **New project → Import your CSV**.
+Three example datasets ship with the repo if you want to try the import wizard first: `demo_coatings_reformulation.csv` (replacing a legacy plasticizer in a coating), `demo_cosmetics_emulsifier_swap.csv` (replacing a legacy PEG emulsifier in an oil-in-water lotion, with viscosity, pH, stability, and spreadability specs) and `demo_food_color_replacement.csv` (replacing FD&C Red No. 3 in a strawberry gummy with a black carrot anthocyanin or a beet concentrate, with color difference, redness, color retention and flavor specs; `make_demo_food_color.py` documents the synthetic model behind it). They are the same files the built-in examples use. Import any of them through **New project → Import your CSV**.
 
 Bring a CSV or Excel sheet where each row is one experiment:
 
@@ -117,6 +119,7 @@ This is a pilot-stage prototype, and the boundaries are stated rather than impli
 ## Project layout
 
 - `app.py`: Streamlit interface
+- `demo_catalog.py`: the three built-in example projects and their configurations; `demo_seed.py` preloads the public sandbox from it
 - `reformulation_engine.py`: candidate generation, models, scoring
 - `closed_loop.py`: retraining loop and qualification gates
 - `assurance_v4.py`: robustness simulation and prospective calibration
