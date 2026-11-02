@@ -81,7 +81,8 @@ class WorkspaceOverviewTest(unittest.TestCase):
         organization_id = str(self.store.user_organizations(owner["id"]).iloc[0]["id"])
 
         overview = self.store.workspace_overview(organization_id, owner["id"])
-        self.assertEqual(len(overview), 1)
+        # The sandbox preloads one project per SANDBOX_KEYS entry (cosmetics first, then food).
+        self.assertEqual(len(overview), 2)
         row = overview.iloc[0]
         self.assertEqual(row["id"], project_id)
         self.assertEqual(row["created_by_email"], DEMO_OWNER_EMAIL)
@@ -102,7 +103,9 @@ class WorkspaceOverviewTest(unittest.TestCase):
             "Student project", config_for(data), organization_id=organization_id, created_by_user_id=student,
         )
         overview = self.store.workspace_overview(organization_id, owner["id"])
-        self.assertEqual(overview["id"].tolist(), [project_id, second])
+        self.assertEqual(overview["id"].tolist()[0], project_id)
+        self.assertEqual(overview["id"].tolist()[-1], second)
+        self.assertEqual(len(overview), 3)
         student_row = overview[overview["id"] == second].iloc[0]
         self.assertEqual(student_row["created_by"], "Student")
         self.assertEqual(int(student_row["historical_rows"]), 0)

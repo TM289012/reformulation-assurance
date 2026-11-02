@@ -261,6 +261,29 @@ class ProductStore(ProjectStore):
         result["is_active"] = bool(result["is_active"])
         return result
 
+    def find_user_by_email(self, email: str) -> dict[str, Any] | None:
+        """Return the active user with this email, without the password hash, or ``None``.
+
+        A plain lookup: it neither checks a password nor counts as a sign-in attempt,
+        so callers that only need to know whether an account exists (the demo seeder)
+        cannot lock the account by asking.
+        """
+        try:
+            email = validate_email(email)
+        except ValueError:
+            return None
+        with self.connection() as con:
+            row = con.execute(
+                "SELECT id, email, display_name, is_active, created_at, last_login_at "
+                "FROM users WHERE email = ? AND is_active = 1",
+                (email,),
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["is_active"] = bool(result["is_active"])
+        return result
+
     def user_organizations(self, user_id: str) -> pd.DataFrame:
         with self.connection() as con:
             rows = con.execute(

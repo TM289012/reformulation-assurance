@@ -25,7 +25,7 @@ All settings are read from environment variables first, then from Streamlit secr
 | `REFORMULATION_ARTIFACT_KEY` | Fernet key that encrypts stored exports. **Required for hosted mode**; without it a key is generated on the server's disposable disk and everything encrypted with it becomes unreadable at the next redeploy. The app shows a red banner to owners while this is missing. |
 | `REFORMULATION_PUBLIC_URL` | The app's public address, used to build invitation and password-reset links. |
 | `REFORMULATION_SMTP_HOST`, `REFORMULATION_SMTP_PORT`, `REFORMULATION_SMTP_USERNAME`, `REFORMULATION_SMTP_PASSWORD`, `REFORMULATION_SMTP_TLS`, `REFORMULATION_SMTP_SSL`, `REFORMULATION_EMAIL_FROM` | Outgoing mail for invitations and password resets. Without SMTP, invitation links stay in the workspace outbox (Team page) and an admin can pass them on by hand; password-reset links are deliberately never shown in the app, so resets need SMTP. Port 587 uses STARTTLS; port 465 uses TLS from the first byte automatically (`REFORMULATION_SMTP_SSL=true`/`false` overrides). |
-| `REFORMULATION_DEMO_MODE` | Public sandbox with the demo project preloaded and a one-click demo login. Never combine with a real database. |
+| `REFORMULATION_DEMO_MODE` | Public sandbox with the cosmetics and food example projects preloaded (`demo_catalog.SANDBOX_KEYS`) and a one-click demo login; `?demo=food` opens on the food project. Never combine with a real database. |
 
 Generate an artifact key once and keep it somewhere safe (a password manager); losing it means losing every stored encrypted export:
 

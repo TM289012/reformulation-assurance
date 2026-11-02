@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.12.6."""
+"""Streamlit application for Reformulation Assurance v0.12.7."""
 from __future__ import annotations
 
 import os
@@ -36,6 +36,7 @@ from notifications import (
     test_message_body,
 )
 from postgres_migration import create_postgres_migration_bundle
+from demo_catalog import DEMO_DATASETS, DEMO_BY_KEY, create_demo_project as build_demo_project
 from ingestion import import_readiness_report, load_table, workbook_preview
 from pilot_store import ADMIN_ROLES, APPROVAL_ROLES, EDIT_ROLES, PilotStore, ROLES, PRIORITIES, TASK_STATUSES
 from product_store import TooManyAttempts
@@ -46,7 +47,6 @@ from process_window import DESIGN_MODES, design_process_window
 APP_DIR = Path(__file__).resolve().parent
 DEFAULT_DB = Path(os.environ.get("REFORMULATION_DB_PATH", APP_DIR / "data" / "reformulation_assurance_v06.db"))
 ARTIFACT_ROOT = Path(os.environ.get("REFORMULATION_ARTIFACT_ROOT", APP_DIR / "data" / "artifacts"))
-DEMO_FILE = APP_DIR / "demo_coatings_reformulation.csv"
 
 
 def _setting(name: str, default: str = "") -> str:
@@ -84,10 +84,10 @@ except ValueError as exc:  # a malformed value must not take the whole app down
     SMTP_SETTINGS = None
     SMTP_PROBLEM = str(exc)
 
-st.set_page_config(page_title="Reformulation Assurance v0.12.6", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.12.7", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.12.6 · design → run → verify → qualify → approve → export")
+st.caption("v0.12.7 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
@@ -138,10 +138,11 @@ def authentication_screen() -> dict[str, Any]:
     print("[boot] auth screen reached", flush=True)
     if DEMO_MODE and not st.session_state.get("current_user"):
         st.info(
-            "**Public demo.** Shared sandbox preloaded with a cosmetics reformulation "
-            "project (88 lots). Anything you enter is visible to other visitors and is "
-            "wiped periodically. Never enter real formulas here — for real work, run the "
-            "app locally so data stays on your machine."
+            "**Public demo.** Shared sandbox preloaded with two reformulation projects: a "
+            "cosmetics emulsifier swap (88 lots) and a food color replacement for FD&C Red "
+            "No. 3 (90 lots). Anything you enter is visible to other visitors and is wiped "
+            "periodically. Never enter real formulas here; for real work, run the app "
+            "locally so data stays on your machine."
         )
         if st.button("Enter the demo", type="primary", use_container_width=True):
             try:
@@ -330,72 +331,39 @@ if DATABASE_URL and not ARTIFACT_KEY and can_admin:
 show_flash()
 
 
-def demo_config(data: pd.DataFrame) -> dict[str, Any]:
-    mixture_columns = [column for column in data.columns if column.startswith("ingredient_")]
-    completed = data[data["status"] == "completed"]
-    baseline = completed.iloc[0][
-        [*mixture_columns, "mix_temperature_c", "mix_time_min", "supplier_family"]
-    ].to_dict()
-    base = {
-        "mixture_columns": mixture_columns,
-        "process_columns": ["mix_temperature_c", "mix_time_min"],
-        "categorical_columns": ["supplier_family"],
-        "response_specs": [
-            {"response": "adhesion", "minimum": 8.0, "maximum": None, "weight": 1.0},
-            {"response": "viscosity_cp", "minimum": 2000.0, "maximum": 2600.0, "weight": 1.0},
-            {"response": "dry_time_min", "minimum": None, "maximum": 40.0, "weight": 1.0},
-            {"response": "gloss", "minimum": 85.0, "maximum": None, "weight": 1.0},
-        ],
-        "mixture_bounds": {
-            "ingredient_resin": [34.0, 62.0],
-            "ingredient_crosslinker": [8.0, 20.0],
-            "ingredient_solvent": [12.0, 35.0],
-            "ingredient_legacy_plasticizer": [0.0, 0.0],
-            "ingredient_substitute_a": [0.0, 18.0],
-            "ingredient_substitute_b": [0.0, 15.0],
-        },
-        "process_bounds": {
-            "mix_temperature_c": [48.0, 72.0],
-            "mix_time_min": [18.0, 42.0],
-        },
-        "category_values": {"supplier_family": ["A", "B", "C"]},
-        "mixture_total": 100.0,
-        "ingredient_to_remove": "ingredient_legacy_plasticizer",
-        "baseline": baseline,
-        "ingredient_costs": {
-            "ingredient_resin": 2.50,
-            "ingredient_crosslinker": 4.80,
-            "ingredient_solvent": 0.90,
-            "ingredient_legacy_plasticizer": 1.30,
-            "ingredient_substitute_a": 1.85,
-            "ingredient_substitute_b": 2.20,
-        },
-        "status_column": "status",
-        "n_recommendations": 5,
-        "candidate_pool_size": 2500,
-        "min_distance": 0.06,
-    }
-    config = ensure_v04_config(base)
-    config["manufacturing_variation"] = default_variation_config(config)
-    return config
-
-
 def format_project(row: pd.Series) -> str:
     return f"{row['name']} · {int(row['experiment_count'])} experiments · {int(row['batch_count'])} batches"
 
 
-def create_demo_project() -> str:
-    data = pd.read_csv(DEMO_FILE)
-    project_id = store.create_project(
-        "Coating Plasticizer Replacement v0.6",
-        demo_config(data),
-        description="Replace the legacy plasticizer and prove repeatability, robustness, approval, and qualification evidence.",
-        source_filename=DEMO_FILE.name,
+def create_demo_project(key: str = "coatings") -> str:
+    """Create one of the built-in example projects (see demo_catalog.py) in this workspace."""
+    return build_demo_project(
+        store,
+        key,
         organization_id=organization_id,
         created_by_user_id=current_user["id"],
     )
-    store.import_history(project_id, data)
-    return project_id
+
+
+def requested_demo_project(projects: pd.DataFrame) -> str | None:
+    """Honor a ``?demo=<key>`` link in demo mode by picking that preloaded project once.
+
+    Lets a post aimed at food developers link straight to the Red No. 3 project while a
+    cosmetics audience lands on the emulsifier swap. Ignored outside demo mode, after the
+    visitor has chosen a project, and for keys that are not in the catalog.
+    """
+    if not DEMO_MODE or st.session_state.get("demo_link_applied"):
+        return None
+    try:
+        key = str(st.query_params.get("demo", "") or "").strip().lower()
+    except Exception:  # noqa: BLE001 - older Streamlit builds without query_params
+        return None
+    st.session_state["demo_link_applied"] = True
+    dataset = DEMO_BY_KEY.get(key)
+    if dataset is None or projects.empty:
+        return None
+    match = projects[projects["name"].astype(str) == dataset.project_name]
+    return str(match.iloc[0]["id"]) if not match.empty else None
 
 
 def project_selector() -> str | None:
@@ -403,6 +371,9 @@ def project_selector() -> str | None:
     if projects.empty:
         return None
     ids = projects["id"].tolist()
+    requested = requested_demo_project(projects)
+    if requested in ids:
+        st.session_state["active_project_id"] = requested
     current = st.session_state.get("active_project_id")
     index = ids.index(current) if current in ids else 0
     selected = st.sidebar.selectbox(
@@ -633,9 +604,20 @@ if page == "New project":
     st.header("Create a project")
     demo_tab, upload_tab = st.tabs(["Start with demo", "Import your CSV"])
     with demo_tab:
-        st.write("Create a coatings project with completed and failed historical trials.")
-        if st.button("Create v0.6 demo project", type="primary"):
-            new_id = create_demo_project()
+        st.write(
+            "Three example projects ship with the app, one per industry. Each is a synthetic "
+            "history of completed and failed trials with the specifications already set, so you "
+            "can go straight to the first recommendation batch."
+        )
+        demo_choice = st.selectbox(
+            "Example project",
+            [dataset.key for dataset in DEMO_DATASETS],
+            format_func=lambda key: DEMO_BY_KEY[key].title,
+            key="demo_dataset_key",
+        )
+        st.caption(DEMO_BY_KEY[demo_choice].summary)
+        if st.button("Create demo project", type="primary"):
+            new_id = create_demo_project(demo_choice)
             st.session_state["active_project_id"] = new_id
             st.success("Demo created. Generate the first recommendation batch next.")
     with upload_tab:
@@ -1014,6 +996,18 @@ elif page == "Project overview":
         chart = snapshots[["created_at", "best_success_probability", "qualification_score"]].copy()
         chart["created_at"] = pd.to_datetime(chart["created_at"])
         st.line_chart(chart.set_index("created_at"), use_container_width=True)
+    if not history.empty:
+        st.markdown("### Experiments on record")
+        status_column = config.get("status_column") or "status"
+        status_counts = history[status_column].astype(str).value_counts()
+        st.caption(
+            "Every imported lot and every experiment run here, with its notes. "
+            + ", ".join(f"{count} {status}" for status, count in status_counts.items())
+            + ". Click a column header to sort, for example by status or notes."
+        )
+        leading = ["experiment_id", "source_type", status_column, "notes"]
+        ordered = [*leading, *[column for column in history.columns if column not in leading]]
+        st.dataframe(history[ordered], use_container_width=True, hide_index=True)
     with st.expander("Project configuration"):
         st.json(config)
 

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Replacing FD&amp;C Red No. 3: a 15-minute walkthrough with Reformulation Assurance</title>
+<meta name="description" content="How a small food brand can run a Red No. 3 color replacement so the trial history, the replicate checks and the sign-off are still there when a buyer or an inspector asks. A worked example in the free sandbox, no install.">
+<link rel="canonical" href="https://tm289012.github.io/reformulation-assurance/red3-replacement.html">
+<meta property="og:title" content="Replacing FD&amp;C Red No. 3: a 15-minute walkthrough">
+<meta property="og:description" content="A worked color-replacement example in a free, open-source formulation workbench: trial history, replicate checks, signed evidence, exportable dossier.">
+<meta property="og:url" content="https://tm289012.github.io/reformulation-assurance/red3-replacement.html">
+<meta property="og:type" content="website">
+<style>
+  :root { --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --accent: #0f766e; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 40px 16px 64px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); line-height: 1.55; background: #f9fafb linear-gradient(180deg, #f0fdfa 0%, #f9fafb 260px) no-repeat; }
+  main { max-width: 760px; margin: 0 auto; }
+  .eyebrow { display: inline-block; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+  h1 { font-size: 2rem; margin: 0 0 8px; }
+  h2 { font-size: 1.25rem; margin: 32px 0 8px; color: var(--accent); }
+  .tagline { color: var(--muted); margin: 0 0 24px; font-size: 1.08rem; max-width: 640px; }
+  p, li { font-size: 0.98rem; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin: 14px 0; box-shadow: 0 1px 3px rgba(15, 118, 110, 0.06); }
+  .card h3 { margin: 0 0 6px; font-size: 1.05rem; }
+  ol li, ul li { margin-bottom: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; background: #fff; }
+  th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f0fdfa; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+  a { color: var(--accent); }
+  .cta { display: inline-block; background: var(--accent); color: #fff; padding: 10px 16px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 6px 0 2px; }
+  footer { margin-top: 36px; font-size: 0.85rem; color: var(--muted); }
+  .note { border-left: 3px solid var(--accent); padding: 8px 14px; background: #fff; color: var(--muted); margin: 16px 0; }
+</style>
+</head>
+<body>
+<main>
+  <span class="eyebrow">Reformulation Assurance</span>
+  <h1>Replacing FD&amp;C Red No. 3</h1>
+  <p class="tagline">A 15-minute walkthrough of a color replacement in the free sandbox: the trial history, the replicate checks, and a sign-off that still says why the winner won when a buyer or an inspector asks a year from now.</p>
+
+  <a class="cta" href="https://reformulation-assurance-demo.streamlit.app/?demo=food">Open the Red No. 3 example in the sandbox</a>
+  <p class="note">The sandbox is shared with other visitors and resets periodically. Never enter real formulas in it. For real work, run the app on your own machine; the <a href="https://github.com/TM289012/reformulation-assurance#quickstart-about-10-minutes">quickstart</a> takes about ten minutes.</p>
+
+  <h2>The deadline, in one paragraph</h2>
+  <p>On January 15, 2025 the FDA revoked the authorization for FD&amp;C Red No. 3 in food and ingested drugs. Food manufacturers have until <strong>January 15, 2027</strong> to reformulate, and makers of ingested drugs until January 18, 2028 (<a href="https://www.fda.gov/food/hfp-constituent-updates/fda-revoke-authorization-use-red-no-3-food-and-ingested-drugs">FDA constituent update</a>). State rules on other synthetic dyes follow from 2027 onward. For a small brand that means a color match done under time pressure, usually with natural colorants that behave differently from the dye they replace, and a record that has to survive retailer questionnaires and inspections long after the people who ran the trials have moved on.</p>
+
+  <h2>Why the record matters as much as the color</h2>
+  <p>Matching the shade is the easy half. The hard half shows up months later: which lots were tried, why each one was run, which result was the one the team actually trusted, who signed off and what they meant by it, and what changed since. In most small teams those answers live in a spreadsheet and three people's memories. The tool keeps them in one place as the work happens, and binds every signature to a hash of the exact evidence on the table at that moment, so nothing can be quietly edited afterwards.</p>
+
+  <h2>The example project</h2>
+  <p>A strawberry gummy colored with Red No. 3. The team has been screening two natural colorants, a black carrot anthocyanin extract and a beet juice concentrate, across cook temperatures and hold times. The history has 90 lots: 18 legacy lots that still contain Red No. 3 and define the color standard, and 72 trials, 8 of which failed outright (color lost during a hot cook, an earthy off-note, a deposit that would not set). Failed lots are evidence too, so they are in the file.</p>
+  <table>
+    <tr><th>Specification</th><th>Limit</th><th>Why</th></tr>
+    <tr><td><code>delta_e_vs_standard</code></td><td>at most 3.0</td><td>Color difference from the legacy standard, the usual commercial tolerance for a drop-in match.</td></tr>
+    <tr><td><code>a_star</code></td><td>at least 38</td><td>Redness. A match that is close in distance but weak in red reads pink on the shelf.</td></tr>
+    <tr><td><code>color_retention_pct</code></td><td>at least 85</td><td>Color kept after four weeks at 40 °C in a light cabinet. Anthocyanins and betanin fade differently, and this is where beet-heavy trials fall down.</td></tr>
+    <tr><td><code>flavor_score</code></td><td>at least 7.5</td><td>Trained-panel score, so an earthy beet note cannot be traded for color.</td></tr>
+  </table>
+  <p>Every number in the dataset is synthetic. The script that generates it, <a href="https://github.com/TM289012/reformulation-assurance/blob/main/make_demo_food_color.py"><code>make_demo_food_color.py</code></a>, spells out the simple model behind it (anthocyanins redder at low pH and tougher in the cook, betanin bluish and heat-sensitive, Red No. 3 strong but light-sensitive), so you can see exactly what you are looking at and swap in your own history when you are ready.</p>
+
+  <h2>Walkthrough</h2>
+  <div class="card">
+    <ol>
+      <li><strong>Enter the sandbox.</strong> Open the <a href="https://reformulation-assurance-demo.streamlit.app/?demo=food">example</a> and click <em>Enter the demo</em>. The food project is selected; the cosmetics one is in the sidebar if you want it later.</li>
+      <li><strong>Read the history</strong> on <em>Project overview</em>, in the <em>Experiments on record</em> table. Sort by status, then read the notes on the failed lots and notice what the "color lost during cook" lots have in common: a lot of beet and a cook above about 120 °C.</li>
+      <li><strong>Recommendations, then <em>Generate next batch</em>.</strong> Model fitting takes 30 to 60 seconds. You get five candidates with different purposes (balanced, highest success probability, lowest disruption, highest information value, lowest cost), each with predictions, uncertainty and a modeled probability of meeting every specification. Read the caption under the table: the probability assumes the responses are independent, and the tool says so. Then <em>Approve and freeze batch</em>, which locks the predictions so they can be scored against reality later.</li>
+      <li><strong>Experiment loop.</strong> Pick a candidate, set its status to completed and enter plausible results, for example <code>delta_e_vs_standard</code> 2.1, <code>a_star</code> 44, <code>color_retention_pct</code> 90, <code>flavor_score</code> 8.0, then <em>Save experiment update</em>. The models retrain and the <em>Calibration</em> page gains a real prospective point.</li>
+      <li><strong>Replicates.</strong> On the same page, set a target of three replicates for your best candidate and <em>Create missing replicates</em>. Enter three readings that agree to the last digit (a* 44.0, 44.0, 44.0): the gate reports chunky data instead of accepting a coefficient of variation of zero. Then make one replicate wild (color difference 2.1, 2.2, 4.9): the <em>Qualification</em> page names the odd replicate and will not pass the stage.</li>
+      <li><strong>Approvals &amp; dossier.</strong> <em>Sign approval</em> for the discovery stage: it asks for your typed name, your password and what the signature means, and binds all of it to the SHA-256 of the evidence as it stands. Then <em>Generate dossier package</em> and open the zip: every experiment, prediction, replicate verdict, approval and the audit trail, with checksums. <em>Generate .eln archive</em> gives the same evidence as one entry for eLabFTW or another lab notebook.</li>
+      <li><strong>Change one result after signing.</strong> Go back to the Experiment loop, edit a measurement, and return to the approvals page. The signature now shows as stale against the current evidence. That is the whole point: the record says what was true when someone put their name to it.</li>
+    </ol>
+  </div>
+
+  <h2>Running it on your own Red No. 3 project</h2>
+  <p>Install locally (nothing leaves your machine; the data is a SQLite file you own) and use <em>New project, Import your CSV</em>. One row per lot, with the ingredient percentages (they should sum to a fixed total), the process conditions, the measured responses, and a status column so failed lots count as evidence. For a color replacement the responses are usually the color difference against your retained standard on your own colorimeter, a* or another chroma measure, retention after your storage protocol, and a sensory score. The import wizard infers bounds from your history and lets you set the specifications, and from there the loop is the one above.</p>
+  <p>If you are mid-way through a replacement and want a second pair of eyes on how to structure the record, <a href="https://github.com/TM289012/reformulation-assurance/issues">open an issue</a>. Criticism from people doing this for real is what the project most needs.</p>
+
+  <footer>
+    Free and open-source (MIT) · <a href="https://github.com/TM289012/reformulation-assurance">Source on GitHub</a> · <a href="index.html">Free checkers</a> · <a href="for-courses.html">For courses</a>
+  </footer>
+</main>
+</body>
+</html>
