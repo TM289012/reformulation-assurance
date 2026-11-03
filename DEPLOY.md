@@ -27,6 +27,8 @@ All settings are read from environment variables first, then from Streamlit secr
 | `REFORMULATION_SMTP_HOST`, `REFORMULATION_SMTP_PORT`, `REFORMULATION_SMTP_USERNAME`, `REFORMULATION_SMTP_PASSWORD`, `REFORMULATION_SMTP_TLS`, `REFORMULATION_SMTP_SSL`, `REFORMULATION_EMAIL_FROM` | Outgoing mail for invitations and password resets. Without SMTP, invitation links stay in the workspace outbox (Team page) and an admin can pass them on by hand; password-reset links are deliberately never shown in the app, so resets need SMTP. Port 587 uses STARTTLS; port 465 uses TLS from the first byte automatically (`REFORMULATION_SMTP_SSL=true`/`false` overrides). |
 | `REFORMULATION_DEMO_MODE` | Public sandbox with the cosmetics and food example projects preloaded (`demo_catalog.SANDBOX_KEYS`) and a one-click demo login; `?demo=food` opens on the food project. Never combine with a real database. |
 
+Community Cloud puts an app to sleep after a stretch without visitors. `.github/workflows/keep-demo-awake.yml` visits both public deployments every four hours in a headless browser (`tools/keep_demo_awake.py`), presses the wake button when the sleeping page is shown, and fails the run if the app does not come up, so a dead demo shows as a red Actions run instead of being discovered by a visitor. Edit `DEFAULT_URLS` in the script if the deployments move.
+
 Generate an artifact key once and keep it somewhere safe (a password manager); losing it means losing every stored encrypted export:
 
 ```bash

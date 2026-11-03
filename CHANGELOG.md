@@ -7,6 +7,7 @@
 - **The public sandbox preloads both the cosmetics and the food project**, and completes an older sandbox in place: a redeploy that ships a new dataset adds the missing project to the existing demo workspace instead of waiting for the next wipe, and still never writes into any workspace that is not the demo's own. A link of the form `?demo=food` (or `cosmetics`) opens the sandbox on that project, so a post aimed at food developers lands on the Red No. 3 example. `ProductStore.find_user_by_email()` is the plain lookup this needs; it is not a sign-in attempt and cannot lock the account.
 - **Project overview lists the experiments on record**, every imported lot and every experiment run in the tool with its status and notes, sortable, so the failure reasons in a history can be read without exporting it.
 - A walkthrough for the food case, [red3-replacement.html](https://tm289012.github.io/reformulation-assurance/red3-replacement.html), joins the project pages. Suite: 117 tests.
+- **The public demo is kept awake.** Community Cloud sleeps an app after a stretch without visitors and shows a "Zzzz" page; the first expert who followed a forum link to the demo met that page and left. A scheduled GitHub Action (`.github/workflows/keep-demo-awake.yml`, every four hours) now opens both public deployments in a real browser with `tools/keep_demo_awake.py`, presses the wake button when it is shown, and waits for the app to render, so the link in a post leads to the app and not to a sleeping page.
 
 ## v0.12.6 (2026-10-02)
 

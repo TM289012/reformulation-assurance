@@ -1,0 +1,30 @@
+# Community Cloud puts an app to sleep after a stretch without visitors and shows a
+# "Zzzz" page that scares off anyone arriving from a forum link. Every few hours this
+# opens both public deployments in a real browser, presses the wake button if needed,
+# and waits until the app has rendered. See tools/keep_demo_awake.py.
+name: Keep the public demo awake
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Playwright
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Visit the deployments
+        run: python tools/keep_demo_awake.py
