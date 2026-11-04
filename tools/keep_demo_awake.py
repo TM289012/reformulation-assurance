@@ -4,8 +4,8 @@ Community Cloud puts an app to sleep after a stretch without visitors and then
 shows a "Zzzz" page with a wake-up button. A stranger who follows a link from a
 forum post lands on that page, waits a minute, and usually leaves. This script
 opens each deployment in a real browser (Playwright, Chromium), presses the
-wake-up button if the page is asleep, waits until the app itself has rendered,
-and keeps the session open for a while so the platform registers a visit.
+wake-up button if the page is asleep, waits until the app itself has rendered (up to fifteen minutes, since a wake that
+follows a redeploy rebuilds the environment first), and keeps the session open for a while so the platform registers a visit.
 
 It is run every couple of hours by ``.github/workflows/keep-demo-awake.yml``
 and can be run by hand::
@@ -33,7 +33,9 @@ DEFAULT_URLS = (
 )
 APP_TITLE = "Reformulation Assurance"
 WAKE_BUTTON = re.compile(r"get this app back up", re.IGNORECASE)
-WAKE_TIMEOUT_S = int(os.environ.get("KEEPALIVE_WAKE_TIMEOUT_S", "480"))
+# A wake right after a redeploy includes a fresh dependency build, which has taken
+# more than eight minutes on Community Cloud, so the wait is generous.
+WAKE_TIMEOUT_S = int(os.environ.get("KEEPALIVE_WAKE_TIMEOUT_S", "900"))
 SESSION_HOLD_S = int(os.environ.get("KEEPALIVE_SESSION_HOLD_S", "45"))
 ARTIFACT_DIR = Path(os.environ.get("KEEPALIVE_ARTIFACT_DIR", "keepalive-artifacts"))
 # A plain desktop Chrome user agent: headless Chromium announces itself as

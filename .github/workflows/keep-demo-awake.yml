@@ -3,13 +3,17 @@
 # opens both public deployments in a real browser, presses the wake button if needed,
 # and waits until the app has rendered. See tools/keep_demo_awake.py.
 #
-# GitHub drops or delays scheduled runs when it is busy, so the schedule is tighter
-# than the sleep window on purpose. "Run workflow" on the Actions tab runs it now.
+# GitHub drops or delays scheduled runs when it is busy, so the schedules are far
+# tighter than the sleep window on purpose, and an outside clock may also trigger it
+# through workflow_dispatch. "Run workflow" on the Actions tab runs it now.
 name: Keep the public demo awake
 
 on:
   schedule:
+    # Two offset schedules, because GitHub drops a large share of scheduled runs on a
+    # quiet repository; this gives it two chances an hour instead of one.
     - cron: "23 */2 * * *"
+    - cron: "41 1-23/2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -22,7 +26,7 @@ concurrency:
 jobs:
   wake:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
