@@ -1,4 +1,4 @@
-"""Streamlit application for Reformulation Assurance v0.12.7."""
+"""Streamlit application for Reformulation Assurance v0.12.8."""
 from __future__ import annotations
 
 import os
@@ -84,10 +84,10 @@ except ValueError as exc:  # a malformed value must not take the whole app down
     SMTP_SETTINGS = None
     SMTP_PROBLEM = str(exc)
 
-st.set_page_config(page_title="Reformulation Assurance v0.12.7", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="Reformulation Assurance v0.12.8", page_icon="🧪", layout="wide")
 print(f"[boot] page config set, demo_mode={DEMO_MODE}", flush=True)
 st.title("Reformulation Assurance")
-st.caption("v0.12.7 · design → run → verify → qualify → approve → export")
+st.caption("v0.12.8 · design → run → verify → qualify → approve → export")
 print("[boot] title rendered", flush=True)
 
 
@@ -159,6 +159,12 @@ def authentication_screen() -> dict[str, Any]:
                     "the app if you are the operator."
                 )
         st.caption(f"Or sign in manually: {DEMO_OWNER_EMAIL} / {DEMO_OWNER_PASSWORD}")
+        st.caption(
+            "Questions, or an old trial sheet you would like run through it? "
+            "Email tm.0624789@gmail.com or open an issue on "
+            "[GitHub](https://github.com/TM289012/reformulation-assurance/issues). "
+            "Send a sheet and you get back what the tool makes of it within two days."
+        )
     if not store.has_users():
         st.subheader("Create the first workspace owner")
         st.info("This account controls the first organization. Use a private deployment for real company data.")

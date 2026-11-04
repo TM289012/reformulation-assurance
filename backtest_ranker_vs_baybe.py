@@ -1,8 +1,12 @@
 """Semi-synthetic benchmark: our GP+RF ranking vs BayBE's recommender vs random.
 
-The question: starting from the same real experiment history, which selection
+The question: starting from the same experiment history, which selection
 brain finds a qualifying reformulation (all specs passed, legacy emulsifier
 absent) in fewer new experiments?
+
+The history is demo_cosmetics_emulsifier_swap.csv, the synthetic 88-lot cosmetics
+example that ships with the app, not a lab's data; the benchmark question is about
+the selection brains, and a synthetic history serves it as long as that is said.
 
 Why not replay the dataset's own rows as candidates? Because the cosmetics
 demo history contains only 13 swap-eligible lots, 5 of which qualify - a pool
@@ -13,12 +17,12 @@ locked to zero), and lab results for those new candidates come from a
 semi-synthetic oracle.
 
 Protocol, per repetition seed:
-  1. Oracle: one random forest per response, fit on the 81 completed real
-     lots. Its noiseless prediction is treated as ground truth; measurement
+  1. Oracle: one random forest per response, fit on the 81 completed lots
+     of the cosmetics history that ships with the app (a synthetic dataset). Its noiseless prediction is treated as ground truth; measurement
      noise equal to its training residual scale is added to what the arms see.
   2. Candidate pool: 400 formulations from the app's generator (same bounds
      as the demo project, legacy = 0). Identical pool for all arms.
-  3. All arms start with the full real history (88 lots) as known
+  3. All arms start with the full shipped history (88 lots) as known
      measurements. Each round the arm picks one pool candidate; the oracle's
      noisy measurement of it is revealed. Success = the round in which the
      arm first picks a candidate whose *noiseless* oracle responses pass all
@@ -32,7 +36,7 @@ Arms:
                 "Highest success probability" purpose. Pure exploitation.
   baybe_scalar  BayBE 0.15 stateless BotorchRecommender with the v1
                 scalarized single target ("spec_margin" - worst normalized
-                in-spec margin across responses, failed real lots = -1).
+                in-spec margin across responses, failed lots = -1).
                 Kept as the handicapped comparison point.
   baybe_desir   BayBE at full strength: native multi-target
                 DesirabilityObjective, one normalized target per response
@@ -104,7 +108,7 @@ def feature_lists(config: dict) -> tuple[list, list, list]:
 
 
 class Oracle:
-    """Per-response ground-truth models fit on the completed real lots.
+    """Per-response ground-truth models fit on the completed historical lots.
 
     Two families are supported so results can be checked for oracle-family
     bias: "rf" (random forest - shares a family with half the app's
@@ -357,7 +361,7 @@ class BaybeArm:
         # Stateless mode has no already-measured bookkeeping (that lives in
         # Campaigns), so the search space is rebuilt each round from only the
         # still-unpicked candidates - by construction every recommendation is
-        # a legal pick. Measurements (real history + prior picks) sit outside
+        # a legal pick. Measurements (shipped history + prior picks) sit outside
         # the space and act purely as surrogate training data. Columns that
         # are constant across the remaining candidates (e.g. the removed
         # legacy ingredient, always 0) are excluded: BayBE rejects constant
@@ -393,7 +397,7 @@ class BaybeDesirabilityArm(BaybeArm):
 
     One normalized target per response, weighted per the project config, so
     BayBE models each response separately - the same information structure
-    the "ours" arm enjoys. Failed real lots (NaN responses) are dropped from
+    the "ours" arm enjoys. Failed historical lots (NaN responses) are dropped from
     this arm's measurements, since desirability targets need numeric values;
     the scalarized arm instead encodes them as margin -1. Disclosed asymmetry.
     """
@@ -534,7 +538,7 @@ def main() -> None:
     print("\n### Experiments needed to find a top-2% formulation (lower is better)\n")
     print(f"Cosmetics demo project. Candidate pool: {pool_size} fresh formulations from the")
     print("app's generator (legacy emulsifier = 0), identical for all arms. All arms start")
-    print(f"with the full real history. {len(seeds)} repetitions per oracle, censored at")
+    print(f"with the full shipped history. {len(seeds)} repetitions per oracle, censored at")
     print(f"{max_rounds} rounds. Target: a pool candidate in the top 2% by true worst-spec")
     print("margin. Two oracle families to control for oracle-model bias.\n")
 

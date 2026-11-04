@@ -6,6 +6,8 @@ When an ingredient gets discontinued or restricted, proving the replacement work
 
 **[▶ Try the live demo in your browser](https://reformulation-assurance-demo.streamlit.app/)**. There's nothing to install, two projects are preloaded (a cosmetics emulsifier swap and a food color replacement for FD&C Red No. 3, which opens directly at [?demo=food](https://reformulation-assurance-demo.streamlit.app/?demo=food)), and one click gets you in. It's a shared public sandbox that resets periodically, so never put real formulas in it. (First load can take ~30 seconds if the app is waking up.)
 
+**Questions, or an old trial sheet you would like run through it?** Email tm.0624789@gmail.com or [open an issue](https://github.com/TM289012/reformulation-assurance/issues). Send a sheet and you get back what the tool makes of it within two days, no strings.
+
 **Facing a deadline?** The worked example for the Red No. 3 food deadline (15 January 2027) is a 15-minute walkthrough: [Replacing FD&C Red No. 3](https://tm289012.github.io/reformulation-assurance/red3-replacement.html). The same loop covers a preservative swap for Washington's formaldehyde-releaser restriction or any other forced substitution.
 
 Reformulation Assurance is an open-source, local-first workbench for ingredient-replacement projects in formulated products: foods, cosmetics, coatings, adhesives, sealants, or anything else mixed to a specification. It takes a team from "our supplier discontinued this plasticizer" to a qualified replacement, with every experiment, model prediction, approval, and decision recorded along the way.
@@ -14,7 +16,7 @@ It runs entirely on your machine. Your formulations live in a SQLite file you ow
 
 **Prefer not to install anything?** A hosted instance with private, self-serve workspaces is at [reformulation-assurance.streamlit.app](https://reformulation-assurance.streamlit.app): create a workspace, invite your team or your students, free while it is in pilot. It is a shared server without MFA or SSO, so keep trade-secret formulations on the local install. To run your own instance, see [DEPLOY.md](DEPLOY.md).
 
-**It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep, including CSV evidence tables, a printable dossier, the signed evidence snapshots, an Excel workbook, and a single `.eln` archive that imports into eLabFTW, RSpace and other lab notebooks as one entry. The `.eln` export is listed among the implementations on the [ELN Consortium's file-format repository](https://github.com/TheELNConsortium/TheELNFileFormat), and the importer fix it prompted in eLabFTW is in that project's main branch ([elabftw/elabftw#7517](https://github.com/elabftw/elabftw/pull/7517)). Local files in, local files out, no lock-in.
+**It attaches to your spreadsheet instead of replacing it.** Working formulators live in Excel, so the workbench treats your workbook as the system of record: import your existing lot history from CSV or Excel, run the analysis here, and everything exports back out as files you keep, including CSV evidence tables, a printable dossier, the signed evidence snapshots, an Excel workbook, and a single `.eln` archive that imports into eLabFTW, RSpace and other lab notebooks as one entry. The `.eln` export is listed among the implementations on the [ELN Consortium's file-format repository](https://github.com/TheELNConsortium/TheELNFileFormat) and on the RO-Crate project's [tools page](https://www.researchobject.org/ro-crate/tools) and [ELN use-case page](https://www.researchobject.org/ro-crate/eln), and the importer fix it prompted in eLabFTW is in that project's main branch ([elabftw/elabftw#7517](https://github.com/elabftw/elabftw/pull/7517)). Local files in, local files out, no lock-in.
 
 ![Demo: generate a batch, record a result, sign the evidence, export the dossier](assets/demo.gif)
 
@@ -134,7 +136,7 @@ More detail in [ARCHITECTURE.md](ARCHITECTURE.md); version history in [CHANGELOG
 
 ## Contributing and feedback
 
-The most valuable contribution right now is domain criticism: wrong terminology, unrealistic qualification stages, a spec or test method no real lab would use, a statistical claim that overreaches. Open an issue and be blunt.
+The most valuable contribution right now is domain criticism: wrong terminology, unrealistic qualification stages, a spec or test method no real lab would use, a statistical claim that overreaches. Open an issue and be blunt, or email tm.0624789@gmail.com if you would rather not post in public.
 
 ## Credits and references
 
