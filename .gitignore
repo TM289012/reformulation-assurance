@@ -32,3 +32,6 @@ BUSINESS_PLAN.md
 # Session helper notes (release steps, drafts) — not part of the product
 v0*_release_*.md
 _to_delete/
+
+# keep-awake diagnostics (uploaded as a workflow artifact)
+keepalive-artifacts/
