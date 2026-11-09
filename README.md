@@ -63,7 +63,7 @@ Then take the built-in tour, which needs no data.
 3. **Approve and freeze batch**, then go to **Experiment loop**, mark an experiment completed, and enter plausible numbers (for the coatings example, adhesion 8.5, viscosity 2300, dry time 35, gloss 90; for the food example, color difference 2.1, a* 44, retention 90, flavor 8.0). Watch the models retrain.
 4. Open **Approvals & dossier**: the evidence hash has changed because the evidence did. Sign the discovery stage (it re-authenticates you and binds the signature to that exact hash), then export the dossier and look inside the zip.
 
-To run the test suite (117 tests):
+To run the test suite (135 tests):
 
 ```bash
 python -m unittest discover -s tests
@@ -104,6 +104,7 @@ This project prefers honest labels over impressive ones. The short version:
 - The feasibility estimate is a separate, uncalibrated classifier and is never blended into anything labeled a probability.
 - Candidate generation is model-ranked random search over the bounded mixture space. It is not Bayesian optimization, and it says so.
 - Backtests cross-validate the same model construction that gets deployed, hyperparameter fitting included.
+- The mixture is modeled on raw mass fractions. A boundary-aware alternative (presence indicators, isometric log-ratio coordinates) exists as an ablation in the benchmark, and on the synthetic history it does not win; the tables are in MODELING_NOTES.
 - The calibration pages exist so the platform can be caught being wrong: frozen predictions vs. actual results, at run level and formulation level.
 
 The full disclosure, including known weaknesses, is in [MODELING_NOTES.md](MODELING_NOTES.md). If you're a formulator or statistician and can find a problem that isn't already listed there, please open an issue. That's exactly the feedback this project wants.

@@ -38,6 +38,8 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold, cross_val_predict
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
+from composition_features import CompositionFeatures, CompositionSpec
+
 
 @dataclass(frozen=True)
 class Specification:
@@ -77,17 +79,58 @@ class ReformulationResult:
 
 
 class MixedFeatureEncoder:
-    """Small dense encoder for numeric and categorical experiment variables."""
+    """Small dense encoder for numeric and categorical experiment variables.
 
-    def __init__(self, numeric_columns: Sequence[str], categorical_columns: Sequence[str]):
+    By default the numeric columns are standardized as they are (raw mass
+    fractions for the mixture). Given a ``CompositionSpec`` whose representation
+    is not ``"raw"``, the encoder adds the boundary-aware features from
+    ``composition_features`` (presence indicators, and for ``presence_ilr`` the
+    isometric log-ratio coordinates in place of the raw mixture columns); the
+    mixture columns must then be present in every frame passed in. The app does
+    not set a composition; the benchmark's ablation arms do.
+    """
+
+    def __init__(
+        self,
+        numeric_columns: Sequence[str],
+        categorical_columns: Sequence[str],
+        composition: CompositionSpec | None = None,
+    ):
         self.numeric_columns = list(numeric_columns)
         self.categorical_columns = list(categorical_columns)
         self.scaler = StandardScaler()
         self.onehot: OneHotEncoder | None = None
+        self.composition = composition if composition is not None and composition.representation != "raw" else None
+        self.composition_features: CompositionFeatures | None = None
         self._fitted = False
 
+    @property
+    def raw_numeric_columns(self) -> list[str]:
+        """Numeric columns standardized as they are; ilr replaces the mixture columns."""
+        if self.composition is not None and self.composition.uses_ilr:
+            mixture = set(self.composition.mixture_columns)
+            return [c for c in self.numeric_columns if c not in mixture]
+        return list(self.numeric_columns)
+
+    def _numeric_frame(self, data: pd.DataFrame) -> pd.DataFrame:
+        assert self.composition_features is not None
+        raw = data[self.raw_numeric_columns].astype(float)
+        derived = self.composition_features.transform(data)
+        return pd.concat([raw, derived], axis=1)
+
+    @property
+    def numeric_feature_names(self) -> list[str]:
+        if self.composition is None or self.composition_features is None:
+            return list(self.numeric_columns)
+        return [*self.raw_numeric_columns, *self.composition_features.feature_names]
+
     def fit(self, data: pd.DataFrame) -> "MixedFeatureEncoder":
-        if self.numeric_columns:
+        if self.composition is not None:
+            self.composition_features = CompositionFeatures(self.composition).fit(data)
+            numeric = self._numeric_frame(data)
+            if numeric.shape[1]:
+                self.scaler.fit(numeric)
+        elif self.numeric_columns:
             self.scaler.fit(data[self.numeric_columns].astype(float))
         if self.categorical_columns:
             # sklearn renamed sparse to sparse_output in 1.2. Support both APIs.
@@ -103,7 +146,11 @@ class MixedFeatureEncoder:
         if not self._fitted:
             raise RuntimeError("encoder must be fitted before transform")
         parts: list[np.ndarray] = []
-        if self.numeric_columns:
+        if self.composition is not None:
+            numeric = self._numeric_frame(data)
+            if numeric.shape[1]:
+                parts.append(self.scaler.transform(numeric))
+        elif self.numeric_columns:
             parts.append(self.scaler.transform(data[self.numeric_columns].astype(float)))
         if self.categorical_columns:
             assert self.onehot is not None
@@ -320,21 +367,40 @@ def _fit_response_model(
     categorical_columns: Sequence[str],
     response: str,
     random_state: int,
+    composition: CompositionSpec | None = None,
 ) -> tuple[_ResponseModel, list[str]]:
+    """Fit the GP and the random forest for one response.
+
+    ``composition`` is optional and off by default; when it asks for a
+    boundary-aware representation, ``feature_columns`` must include every mixture
+    column so the derived features can be computed (see ``composition_features``).
+    """
+    composition_columns: list[str] = []
+    if composition is not None and composition.representation != "raw":
+        composition_columns = [c for c in composition.mixture_columns if c not in feature_columns]
+        if composition_columns:
+            raise ValueError(
+                "feature_columns must include the mixture columns for a composition "
+                f"representation; missing: {', '.join(composition_columns)}"
+            )
+        composition_columns = list(composition.mixture_columns)
     frame = data.loc[data[response].notna(), [*feature_columns, response]].copy()
-    for column in numeric_columns:
+    numeric_needed = list(dict.fromkeys([*numeric_columns, *composition_columns]))
+    for column in numeric_needed:
         frame[column] = pd.to_numeric(frame[column], errors="coerce")
     frame[response] = pd.to_numeric(frame[response], errors="coerce")
-    frame = frame.replace([np.inf, -np.inf], np.nan).dropna(subset=[*numeric_columns, response])
+    frame = frame.replace([np.inf, -np.inf], np.nan).dropna(subset=[*numeric_needed, response])
     if len(frame) < 8:
         raise ValueError(f"'{response}' needs at least 8 completed measurements")
 
-    encoder = MixedFeatureEncoder(numeric_columns, categorical_columns)
+    encoder = MixedFeatureEncoder(numeric_columns, categorical_columns, composition=composition)
     X = encoder.fit_transform(frame[feature_columns])
     y = frame[response].to_numpy(dtype=float)
 
     gp = _build_gp(X.shape[1], random_state)
     notes: list[str] = []
+    if encoder.composition_features is not None:
+        notes.append(f"Features for '{response}': {encoder.composition_features.describe()}.")
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always", ConvergenceWarning)
         gp.fit(X, y)

@@ -46,6 +46,24 @@ Arms:
   Both BayBE arms need `pip install "baybe==0.15.*"`; skipped politely if
   absent. Two oracle families (rf, mlp) run by default so oracle-model bias
   is controlled rather than merely disclosed.
+  ours_presence
+                The "ours" arm with a presence indicator I(x > 0) added for
+                every ingredient that is absent from some lots of the history
+                (here the legacy emulsifier and the glucoside co-emulsifier),
+                the raw fraction kept as the dosage. Same information, a
+                boundary-aware encoding; see composition_features.py.
+  ours_presence_ilr
+                The indicators above plus isometric log-ratio coordinates of
+                the whole composition (multiplicative zero replacement, a
+                sequential binary partition that puts the reformulation slot
+                first) in place of the raw mixture fractions.
+  The two ablation arms answer the November 2026 matsci.org review: does a
+  boundary-aware representation change what the ranker picks? They are run
+  with --arms ours,ours_presence,ours_presence_ilr,random, normally into a
+  separate file (--output backtest_ablation_results.csv). --history-size N
+  subsamples the starting history to N lots per seed for a sparse-history
+  condition, where representation should matter more than it does with the
+  full 88 lots.
 
 Disclosed limitations of v1: the oracle is itself a model (random forest, so
 half of the "ours" ensemble family - a bias we accept and state); real
@@ -75,6 +93,7 @@ from sklearn.ensemble import RandomForestRegressor
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
+from composition_features import composition_spec_from_config  # noqa: E402
 from demo_seed import cosmetics_config  # noqa: E402
 from reformulation_engine import (  # noqa: E402
     MixedFeatureEncoder,
@@ -86,6 +105,7 @@ from reformulation_engine import (  # noqa: E402
 
 DEFAULT_SEEDS = (0, 1, 2, 3, 4)
 POOL_SIZE = 400
+OURS_ARMS = {"ours": "raw", "ours_presence": "presence", "ours_presence_ilr": "presence_ilr"}
 
 
 # ---------------------------------------------------------------------------
@@ -217,13 +237,25 @@ def pick_random(rng, measurements, remaining, config) -> int:
     return int(rng.integers(len(remaining)))
 
 
-def pick_ours(rng, measurements, remaining, config) -> int:
+def pick_ours(rng, measurements, remaining, config, representation: str = "raw") -> int:
+    """The app's ranking; ``representation`` selects the ablation encodings.
+
+    "raw" is the control, byte for byte the arm the earlier results were made
+    with. "presence" and "presence_ilr" keep the same active columns and add the
+    derived features from composition_features; every mixture column is passed
+    through so the derived features can be computed, but the removed ingredient
+    (constant in the pool) still contributes no raw feature of its own.
+    """
     numeric, categorical, features = feature_lists(config)
     active = config.get("_active_columns")
     if active is not None:
         numeric = [c for c in numeric if c in active]
         categorical = [c for c in categorical if c in active]
         features = [*numeric, *categorical]
+    composition = None
+    if representation != "raw":
+        composition = composition_spec_from_config(config, representation)
+        features = list(dict.fromkeys([*numeric, *composition.mixture_columns, *categorical]))
     joint = np.ones(len(remaining))
     for spec_dict in config["response_specs"]:
         spec = Specification(
@@ -233,11 +265,46 @@ def pick_ours(rng, measurements, remaining, config) -> int:
             weight=spec_dict.get("weight", 1.0),
         )
         model, _ = _fit_response_model(
-            measurements, features, numeric, categorical, spec.response, random_state=42
+            measurements,
+            features,
+            numeric,
+            categorical,
+            spec.response,
+            random_state=42,
+            composition=composition,
         )
         mean, std, _ = model.predict(remaining[features])
         joint *= specification_probability(mean, std, spec)
     return int(np.argmax(joint))
+
+
+def make_ours_arm(representation: str):
+    def pick(rng, measurements, remaining, config) -> int:
+        return pick_ours(rng, measurements, remaining, config, representation=representation)
+
+    pick.__name__ = f"pick_ours_{representation}"
+    return pick
+
+
+def subsample_history(data: pd.DataFrame, size: int | None, seed: int) -> pd.DataFrame:
+    """A sparse-history condition: ``size`` lots drawn without replacement per seed.
+
+    The draw keeps the status mix of the full history roughly (completed and
+    failed lots are sampled in proportion), so a small history still shows the
+    ranker a failure or two. ``None`` or a size at least the history returns the
+    history unchanged.
+    """
+    if size is None or size >= len(data):
+        return data
+    rng = np.random.default_rng(20_000 + seed)
+    status = data["status"].astype(str).str.lower()
+    picks: list[int] = []
+    for value in sorted(status.unique()):
+        rows = np.flatnonzero(status.to_numpy() == value)
+        share = int(round(size * len(rows) / len(data)))
+        picks.extend(rng.choice(rows, size=min(share, len(rows)), replace=False).tolist())
+    picks = sorted(picks)[:size]
+    return data.iloc[picks].reset_index(drop=True)
 
 
 def _build_target(name: str, lo, hi, values: pd.Series):
@@ -419,7 +486,15 @@ class BaybeDesirabilityArm(BaybeArm):
 # Replay
 # ---------------------------------------------------------------------------
 
-def replay(arm_name, pick, data, config, oracle, seed, pool_size, max_rounds, verbose=True):
+def replay(
+    arm_name, pick, data, config, oracle, seed, pool_size, max_rounds, verbose=True, history=None
+):
+    """One arm, one seed. ``history`` is what the arm starts from (default: all of ``data``).
+
+    The oracle, the pool, the pass/fail truth and the top-2% threshold are
+    always derived from the full data, so a sparse-history condition changes
+    only what the arm knows, never what counts as success.
+    """
     rng = np.random.default_rng(10_000 + seed)
     pool = generate_pool(config, seed, pool_size)
     true_responses = oracle.true_responses(pool)
@@ -434,7 +509,7 @@ def replay(arm_name, pick, data, config, oracle, seed, pool_size, max_rounds, ve
     _, _, params = feature_lists(config)
     config = {**config, "_active_columns": [c for c in params if pool[c].nunique() > 1]}
 
-    measurements = data.copy()
+    measurements = (data if history is None else history).copy()
     remaining = pool.copy()
     remaining_pass = truth_pass.copy()
     remaining_margin = true_margins.copy()
@@ -474,6 +549,17 @@ def main() -> None:
     parser.add_argument("--seeds", default=",".join(map(str, DEFAULT_SEEDS)))
     parser.add_argument("--max-rounds", type=int, default=40)
     parser.add_argument("--pool-size", type=int, default=POOL_SIZE)
+    parser.add_argument(
+        "--history-size",
+        type=int,
+        default=None,
+        help="start every arm from a random subsample of this many history lots (per seed)",
+    )
+    parser.add_argument(
+        "--output",
+        default="backtest_results.csv",
+        help="where the per-run rows go, relative to the project folder",
+    )
     parser.add_argument("--smoke", action="store_true")
     args = parser.parse_args()
 
@@ -492,13 +578,13 @@ def main() -> None:
         oracle = Oracle(data, config, kind=oracle_kind)
         for seed in seeds:
             pool = generate_pool(config, seed, pool_size)
-            history = data
+            history = subsample_history(data, args.history_size, seed)
             arms: dict[str, object] = {}
             for name in arm_names:
                 if name == "random":
                     arms[name] = pick_random
-                elif name == "ours":
-                    arms[name] = pick_ours
+                elif name in OURS_ARMS:
+                    arms[name] = make_ours_arm(OURS_ARMS[name])
                 elif name in ("baybe", "baybe_scalar", "baybe_desir"):
                     arm_cls = BaybeDesirabilityArm if name == "baybe_desir" else BaybeArm
                     try:
@@ -511,15 +597,20 @@ def main() -> None:
                     raise SystemExit(f"unknown arm '{name}'")
 
             for arm_name, pick in arms.items():
-                print(f"  running oracle={oracle_kind} arm={arm_name} seed={seed} ...", flush=True)
+                print(
+                    f"  running oracle={oracle_kind} arm={arm_name} seed={seed} "
+                    f"(history {len(history)} lots) ...",
+                    flush=True,
+                )
                 rounds_top, rounds_pass, base_rate = replay(
-                    arm_name, pick, data, config, oracle, seed, pool_size, max_rounds
+                    arm_name, pick, data, config, oracle, seed, pool_size, max_rounds, history=history
                 )
                 records.append(
                     {
                         "oracle": oracle_kind,
                         "arm": arm_name,
                         "seed": seed,
+                        "history_lots": len(history),
                         "rounds_to_top2pct": rounds_top,
                         "rounds_to_first_pass": rounds_pass,
                         "pool_base_rate": base_rate,
@@ -533,12 +624,18 @@ def main() -> None:
                 )
 
     results = pd.DataFrame(records)
-    results.to_csv(ROOT / "backtest_results.csv", index=False)
+    output_path = ROOT / args.output
+    results.to_csv(output_path, index=False)
 
+    history_note = (
+        "with the full shipped history"
+        if args.history_size is None
+        else f"from a random {args.history_size}-lot subsample of the history (drawn per seed)"
+    )
     print("\n### Experiments needed to find a top-2% formulation (lower is better)\n")
     print(f"Cosmetics demo project. Candidate pool: {pool_size} fresh formulations from the")
     print("app's generator (legacy emulsifier = 0), identical for all arms. All arms start")
-    print(f"with the full shipped history. {len(seeds)} repetitions per oracle, censored at")
+    print(f"{history_note}. {len(seeds)} repetitions per oracle, censored at")
     print(f"{max_rounds} rounds. Target: a pool candidate in the top 2% by true worst-spec")
     print("margin. Two oracle families to control for oracle-model bias.\n")
 
@@ -564,7 +661,7 @@ def main() -> None:
     print(f"\nSecondary metric, rounds to the first merely-passing candidate")
     print(f"(easy at a {rate:.0%} mean pool pass rate, shown for context):\n")
     summary_table(results, "rounds_to_first_pass")
-    print("\nRaw per-run rows: backtest_results.csv")
+    print(f"\nRaw per-run rows: {output_path.name}")
 
 
 if __name__ == "__main__":

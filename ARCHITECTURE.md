@@ -3,6 +3,8 @@
 ## Scientific layer
 
 - `reformulation_engine.py`: candidate generation and response modeling
+- `composition_features.py` (v0.12.9): optional boundary-aware encodings of the mixture (presence indicators, isometric log-ratio coordinates); off in the app, used by the benchmark's ablation arms
+- `backtest_ranker_vs_baybe.py` and `ablation_boundary_features.py`: the semi-synthetic selection benchmark and the predictive ablation of the encodings
 - `assurance_v4.py`: robustness, repeatability, and two-level calibration
 - `process_window.py`: bounded qualification-study design
 - `closed_loop.py`: retraining and qualification gates
